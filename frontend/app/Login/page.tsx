@@ -39,11 +39,13 @@ export default function LoginPage() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      setSuccess(`Login berhasil. Selamat datang, ${data.user.nama}!`);
+      setSuccess(`Login berhasil. Selamat datang, ${data.user.nama || "Admin"}!`);
       setEmail("");
       setPassword("");
 
-      router.push("/Dashboard");
+      setTimeout(() => {
+        router.push("/Dashboard");
+      }, 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan");
     } finally {
@@ -52,51 +54,54 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10 text-slate-50">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl bg-slate-900 shadow-2xl shadow-slate-950/40 lg:grid-cols-2">
-        <section className="hidden bg-gradient-to-br from-indigo-600 via-sky-500 to-cyan-400 p-10 lg:flex lg:flex-col lg:justify-between">
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 font-sans">
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-xl border border-slate-200/80 lg:grid-cols-2">
+        <section className="hidden bg-[#111844] p-10 lg:flex lg:flex-col lg:justify-between text-white">
           <div>
-            <p className="mb-3 inline-flex rounded-full bg-white/20 px-3 py-1 text-sm font-medium backdrop-blur">
-              Ticket Konser
-            </p>
-            <h1 className="text-4xl font-bold leading-tight">
-              Masuk ke akun Anda untuk menikmati event favorit.
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center border border-white/20">
+                <div className="w-4 h-4 rounded-full bg-white" />
+              </div>
+              <span className="font-extrabold text-xl tracking-tight">Concertix</span>
+            </div>
+            <h1 className="text-3xl font-extrabold leading-tight tracking-tight">
+              Event Management &amp; Ticketing Executive Portal
             </h1>
-            <p className="mt-4 max-w-md text-sm text-slate-100/90">
-              Kelola pemesanan tiket, lihat event, dan pantau transaksi dengan mudah.
+            <p className="mt-4 text-sm text-indigo-100/90 leading-relaxed">
+              Kelola konser, pantau penjualan tiket, lacak pendapatan harian, dan proses pesanan pelanggan — semua dalam satu platform executive.
             </p>
           </div>
-          <div className="rounded-2xl bg-white/15 p-4 text-sm backdrop-blur">
-            Gunakan email dan password yang sudah terdaftar di backend Anda.
+          <div className="rounded-xl bg-white/10 p-4 text-xs backdrop-blur border border-white/10 text-indigo-100">
+            Gunakan kredensial admin Anda untuk mengakses dashboard manajemen event.
           </div>
         </section>
 
-        <section className="p-6 sm:p-10">
-          <div className="mx-auto max-w-md">
-            <p className="mb-2 text-sm font-medium text-cyan-300">Selamat datang</p>
-            <h2 className="text-3xl font-bold text-white">Login</h2>
-            <p className="mt-2 text-sm text-slate-400">
-              Silakan masuk untuk melanjutkan ke dashboard.
+        <section className="p-6 sm:p-10 flex flex-col justify-center">
+          <div className="mx-auto w-full max-w-sm">
+            <p className="mb-1.5 text-xs font-bold text-[#111844] uppercase tracking-wider">Welcome back</p>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Admin Sign In</h2>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Silakan masukkan kredensial Anda untuk mengakses panel manajemen.
             </p>
 
             <form onSubmit={handleLogin} className="mt-8 space-y-4">
               <div>
-                <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-200">
-                  Email
+                <label htmlFor="email" className="mb-1.5 block text-xs sm:text-sm font-semibold text-slate-700">
+                  Email Address
                 </label>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="admin@email.com"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
+                  placeholder="admin@concertix.io"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#111844] focus:ring-1 focus:ring-[#111844]"
                   required
                 />
               </div>
 
               <div>
-                <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-200">
+                <label htmlFor="password" className="mb-1.5 block text-xs sm:text-sm font-semibold text-slate-700">
                   Password
                 </label>
                 <input
@@ -105,19 +110,19 @@ export default function LoginPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#111844] focus:ring-1 focus:ring-[#111844]"
                   required
                 />
               </div>
 
               {error ? (
-                <div className="rounded-xl border border-rose-500/50 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
                   {error}
                 </div>
               ) : null}
 
               {success ? (
-                <div className="rounded-xl border border-emerald-500/50 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
                   {success}
                 </div>
               ) : null}
@@ -125,16 +130,16 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-70"
+                className="w-full rounded-xl bg-[#111844] hover:bg-[#0a0f2b] px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-xs transition disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Memproses..." : "Masuk"}
+                {loading ? "Signing in..." : "Masuk ke Dashboard"}
               </button>
             </form>
 
-            <p className="mt-4 text-center text-sm text-slate-400">
-              Belum punya akun?{" "}
-              <Link href="/Register" className="font-medium text-cyan-300 hover:text-cyan-200">
-                Daftar sekarang
+            <p className="mt-6 text-center text-xs text-slate-500">
+              Belum punya akun admin?{" "}
+              <Link href="/Register" className="font-semibold text-[#111844] hover:underline">
+                Daftar di sini
               </Link>
             </p>
           </div>

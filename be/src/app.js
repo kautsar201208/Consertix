@@ -12,6 +12,7 @@ const ticketRoutes = require("./routes/ticketRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use("/api/tickets", ticketRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/users", userRoutes);
 
 app.get("/", (req, res) => {
   res.json({

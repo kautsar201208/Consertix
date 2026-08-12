@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Login Tiket Konser",
-  description: "Halaman login untuk aplikasi tiket konser.",
+  title: "Concertix — Modern Event Management & Ticketing Admin Dashboard",
+  description: "Executive admin panel for managing concerts, festivals, conferences, ticketing, revenue analytics, and transactions.",
 };
 
 export default function RootLayout({
@@ -25,9 +25,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full bg-slate-950 text-slate-100 flex flex-col font-sans">
+        {children}
+      </body>
     </html>
   );
 }
