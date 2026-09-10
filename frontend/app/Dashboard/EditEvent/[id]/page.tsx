@@ -17,6 +17,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 
+interface TicketCategory {
+  id?: number;
+  nama_kategori: string;
+  harga: string;
+  stok: string;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
 export default function EditEventPage() {
@@ -33,6 +40,7 @@ export default function EditEventPage() {
     lokasi: "",
     status: "aktif"
   });
+  const [ticketCategories, setTicketCategories] = useState<TicketCategory[]>([]);
 
   const [poster, setPoster] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -66,6 +74,17 @@ export default function EditEventPage() {
           status: data.status || "aktif"
         });
 
+        setTicketCategories(
+          Array.isArray(data.ticket_categories)
+            ? data.ticket_categories.map((category: { id?: number; nama_kategori?: string; harga?: number; stok?: number }) => ({
+                id: category.id,
+                nama_kategori: category.nama_kategori || "",
+                harga: String(category.harga ?? ""),
+                stok: String(category.stok ?? "")
+              }))
+            : []
+        );
+
         if (data.poster) {
           setExistingPoster(data.poster);
         }
@@ -96,6 +115,11 @@ export default function EditEventPage() {
     if (!form.tanggal) newErrors.tanggal = "Tanggal wajib diisi.";
     if (!form.jam) newErrors.jam = "Jam wajib diisi.";
     if (!form.lokasi.trim()) newErrors.lokasi = "Lokasi wajib diisi.";
+    ticketCategories.forEach((category, index) => {
+      if (!category.nama_kategori.trim()) newErrors[`category_name_${index}`] = "Nama kategori wajib diisi.";
+      if (!category.harga || Number(category.harga) <= 0) newErrors[`category_price_${index}`] = "Harga harus lebih dari 0.";
+      if (!category.stok || Number(category.stok) <= 0) newErrors[`category_stock_${index}`] = "Stok minimal 1.";
+    });
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -125,6 +149,15 @@ export default function EditEventPage() {
       formData.append("jam", form.jam);
       formData.append("lokasi", form.lokasi);
       formData.append("status", form.status);
+      formData.append(
+        "ticket_categories",
+        JSON.stringify(ticketCategories.map((category) => ({
+          id: category.id,
+          nama_kategori: category.nama_kategori.trim(),
+          harga: Number(category.harga),
+          stok: Number(category.stok)
+        })))
+      );
       if (poster) {
         formData.append("poster", poster);
       }
@@ -391,7 +424,55 @@ export default function EditEventPage() {
             </div>
           </div>
 
-          {/* Section 3: Poster */}
+          {/* Section 3: Ticket Categories */}
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
+              Kategori Tiket
+            </h3>
+            {ticketCategories.length === 0 ? (
+              <p className="text-xs text-slate-500">Belum ada kategori tiket untuk event ini.</p>
+            ) : (
+              <div className="space-y-3">
+                {ticketCategories.map((category, index) => (
+                  <div key={category.id || index} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-semibold text-slate-600">Nama Kategori</label>
+                      <input
+                        value={category.nama_kategori}
+                        onChange={(e) => setTicketCategories((previous) => previous.map((item, itemIndex) => itemIndex === index ? { ...item, nama_kategori: e.target.value } : item))}
+                        className={inputClass(`category_name_${index}`)}
+                      />
+                      {errors[`category_name_${index}`] && <p className="text-[11px] text-rose-500">{errors[`category_name_${index}`]}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-semibold text-slate-600">Harga (Rp)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={category.harga}
+                        onChange={(e) => setTicketCategories((previous) => previous.map((item, itemIndex) => itemIndex === index ? { ...item, harga: e.target.value } : item))}
+                        className={inputClass(`category_price_${index}`)}
+                      />
+                      {errors[`category_price_${index}`] && <p className="text-[11px] text-rose-500">{errors[`category_price_${index}`]}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-semibold text-slate-600">Stok</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={category.stok}
+                        onChange={(e) => setTicketCategories((previous) => previous.map((item, itemIndex) => itemIndex === index ? { ...item, stok: e.target.value } : item))}
+                        className={inputClass(`category_stock_${index}`)}
+                      />
+                      {errors[`category_stock_${index}`] && <p className="text-[11px] text-rose-500">{errors[`category_stock_${index}`]}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 4: Poster */}
           <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5 space-y-3">
             <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
               Poster Event{" "}

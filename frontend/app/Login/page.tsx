@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -59,8 +60,14 @@ export default function LoginPage() {
         <section className="hidden bg-[#111844] p-10 lg:flex lg:flex-col lg:justify-between text-white">
           <div>
             <div className="flex items-center gap-3 mb-8">
-              <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center border border-white/20">
-                <div className="w-4 h-4 rounded-full bg-white" />
+              <div className="w-16 h-16 rounded-2xl bg-white/5 backdrop-blur flex items-center justify-center border border-white/10">
+                <Image
+                  src="/images/concertix-logo.svg"
+                  alt="Concertix Logo"
+                  width={72}
+                  height={72}
+                  className="w-14 h-14 object-contain"
+                />
               </div>
               <span className="font-extrabold text-xl tracking-tight">Concertix</span>
             </div>

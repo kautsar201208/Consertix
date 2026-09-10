@@ -168,7 +168,22 @@ const getEvent = (req, res) => {
         });
       }
 
-      res.json(result[0]);
+      db.query(
+        "SELECT id, nama_kategori, harga, stok FROM ticket_categories WHERE event_id = ? ORDER BY id ASC",
+        [id],
+        (categoryErr, categories) => {
+          if (categoryErr) {
+            return res.status(500).json({
+              message: categoryErr.message,
+            });
+          }
+
+          res.json({
+            ...result[0],
+            ticket_categories: categories,
+          });
+        }
+      );
     }
   );
 };
@@ -185,6 +200,7 @@ const updateEvent = (req, res) => {
     jam,
     lokasi,
     status,
+    ticket_categories: ticketCategoriesPayload,
   } = req.body;
 
   const poster = req.file ? req.file.filename : null;
@@ -251,8 +267,37 @@ const updateEvent = (req, res) => {
       });
     }
 
-    res.json({
-      message: "Event berhasil diubah",
+    const ticketCategories = parseTicketCategories(ticketCategoriesPayload);
+    if (ticketCategories.length === 0) {
+      return res.json({ message: "Event berhasil diubah" });
+    }
+
+    let pending = ticketCategories.length;
+    let categoryError = null;
+    ticketCategories.forEach((category) => {
+      const categoryValues = [
+        category.nama_kategori.trim(),
+        Number(category.harga),
+        Number(category.stok),
+        id,
+      ];
+      const categorySql = category.id
+        ? "UPDATE ticket_categories SET nama_kategori = ?, harga = ?, stok = ? WHERE id = ? AND event_id = ?"
+        : "INSERT INTO ticket_categories (event_id, nama_kategori, harga, stok) VALUES (?, ?, ?, ?)";
+      const values = category.id
+        ? [...categoryValues, id]
+        : [id, ...categoryValues.slice(0, 3)];
+
+      db.query(categorySql, values, (updateErr) => {
+        if (updateErr) categoryError = updateErr;
+        pending -= 1;
+        if (pending === 0) {
+          if (categoryError) {
+            return res.status(500).json({ message: categoryError.message });
+          }
+          res.json({ message: "Event dan kategori tiket berhasil diubah" });
+        }
+      });
     });
   });
 };

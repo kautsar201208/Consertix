@@ -1,11 +1,166 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --navy-primary: #111844;
-  --navy-hover: #0a0f2b;
-  --navy-light: #f0f1ff;
+  --background: #f7f9fc;
+  --foreground: #111827;
+  --navy-primary: #1b1f52;
+  --navy-hover: #2d4cf2;
+  --navy-light: #f8fafc;
+  --card: #ffffff;
+  --card-hover: #f8fafc;
+  --primary-button: #3f5bff;
+  --primary-button-hover: #2d4cf2;
+  --primary-text: #111827;
+  --secondary-text: #6b7280;
+  --border: #e5e7eb;
+  --search-bar: #ffffff;
+  --search-border: #d1d5db;
+  --table-header: #f8fafc;
+  --table-hover: #f1f5f9;
+  --icon: #1b1f52;
+}
+
+html[data-theme="dark"] {
+  --background: #0f172a;
+  --foreground: #f9fafb;
+  --navy-primary: #111c44;
+  --navy-hover: #7c93ff;
+  --navy-light: #1e2a52;
+  --card: #16213e;
+  --card-hover: #1e2a52;
+  --primary-button: #5b7cff;
+  --primary-button-hover: #7c93ff;
+  --primary-text: #f9fafb;
+  --secondary-text: #b8c0d9;
+  --border: #2a3556;
+  --search-bar: #1a2448;
+  --search-border: #31406b;
+  --table-header: #111c44;
+  --table-hover: #1f1559;
+  --icon: #f9fafb;
+}
+
+html[data-theme="dark"] body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] .bg-slate-50\/50,
+html[data-theme="dark"] .bg-slate-50\/60 {
+  background-color: var(--background);
+}
+
+html[data-theme="dark"] .bg-white {
+  background-color: var(--card);
+}
+
+html[data-theme="dark"] .text-slate-900,
+html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-slate-700 {
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] .text-slate-600,
+html[data-theme="dark"] .text-slate-500 {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .text-slate-400 {
+  color: var(--secondary-text);
+}
+
+html[data-theme="dark"] .border-slate-100,
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-slate-200\/80 {
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background-color: var(--search-bar);
+  color: var(--primary-text);
+  border-color: var(--search-border);
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .hover\:bg-slate-50:hover,
+html[data-theme="dark"] .hover\:bg-slate-50\/70:hover {
+  background-color: var(--table-hover);
+}
+
+html[data-theme="dark"] .divide-slate-50 > :not(:last-child),
+html[data-theme="dark"] .divide-slate-100 > :not(:last-child) {
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] footer {
+  background-color: var(--card);
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] .bg-\[\#111844\],
+html[data-theme="dark"] .bg-\[\#0a0f2b\]\/60 {
+  background-color: var(--navy-primary);
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .border-\[\#0a0f2b\] {
+  border-color: var(--navy-primary);
+}
+
+html[data-theme="dark"] .text-\[\#111844\] {
+  color: var(--icon);
+}
+
+html[data-theme="dark"] .text-white {
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .sidebar-active {
+  background-color: #ffffff;
+  color: #1b1f52;
+}
+
+html[data-theme="dark"] .sidebar-active .text-\[\#111844\] {
+  color: #1b1f52;
+}
+
+html[data-theme="dark"] .text-indigo-100,
+html[data-theme="dark"] .text-indigo-200 {
+  color: #f9fafb;
+}
+
+html[data-theme="dark"] .hover\:bg-white\/10:hover,
+html[data-theme="dark"] .hover\:bg-white\/20:hover {
+  background-color: #1e2a52;
+}
+
+html[data-theme="dark"] .bg-white\/10 {
+  background-color: #1a2448;
+}
+
+html[data-theme="dark"] .border-white\/10,
+html[data-theme="dark"] .border-white\/15,
+html[data-theme="dark"] .border-white\/20 {
+  border-color: #2a3556;
+}
+
+html[data-theme="dark"] .bg-indigo-600 {
+  background-color: var(--primary-button);
+}
+
+html[data-theme="dark"] .hover\:bg-indigo-700:hover {
+  background-color: var(--primary-button-hover);
+}
+
+html[data-theme="dark"] .ring-\[\#111844\] {
+  --tw-ring-color: var(--navy-primary);
 }
 
 body {
@@ -17,16 +172,32 @@ body {
 
 /* Navy custom utility helpers */
 .bg-navy {
-  background-color: #111844;
+  background-color: var(--navy-primary);
 }
 .bg-navy-hover:hover {
-  background-color: #0a0f2b;
+  background-color: var(--primary-button-hover);
 }
 .text-navy {
-  color: #111844;
+  color: var(--icon);
 }
 .border-navy {
-  border-color: #111844;
+  border-color: var(--navy-primary);
+}
+
+.bg-\[\#111844\] {
+  background-color: var(--navy-primary);
+}
+
+.text-\[\#111844\] {
+  color: var(--icon);
+}
+
+.border-\[\#0a0f2b\] {
+  border-color: var(--navy-primary);
+}
+
+.hover\:bg-\[\#0a0f2b\]:hover {
+  background-color: var(--primary-button-hover);
 }
 
 /* Custom scrollbars */

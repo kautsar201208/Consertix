@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,6 +17,13 @@ import {
   LogOut
 } from "lucide-react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+
+type BadgeType = "events" | "transactions" | null;
+
+type ApiEvent = { status?: string };
+type ApiPayment = { status?: string };
+
 interface SidebarProps {
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
@@ -28,37 +36,37 @@ export const navItems = [
     label: "Dashboard",
     href: "/Dashboard",
     icon: LayoutDashboard,
-    hasBadge: false
+    badgeType: null as BadgeType
   },
   {
     label: "Events",
     href: "/Dashboard/DaftarEvent",
     icon: CalendarDays,
-    hasBadge: true
+    badgeType: "events" as BadgeType
   },
   {
     label: "Add Event",
     href: "/Dashboard/TambahEvent",
     icon: PlusCircle,
-    hasBadge: false
+    badgeType: null as BadgeType
   },
   {
     label: "Transactions",
     href: "/Dashboard/Transaksi",
     icon: Receipt,
-    hasBadge: true
+    badgeType: "transactions" as BadgeType
   },
   {
     label: "Analytics",
     href: "/Dashboard/Laporan",
     icon: BarChart3,
-    hasBadge: false
+    badgeType: null as BadgeType
   },
   {
     label: "Users",
     href: "/Dashboard/ManagementUser",
     icon: Users,
-    hasBadge: false
+    badgeType: null as BadgeType
   }
 ];
 
@@ -71,18 +79,40 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<{ nama?: string; email?: string } | null>(null);
+  const [attention, setAttention] = useState({ events: false, transactions: false });
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedUser = localStorage.getItem("user");
       if (savedUser) {
         try {
-          setUser(JSON.parse(savedUser));
-        } catch (e) {
+          Promise.resolve().then(() => setUser(JSON.parse(savedUser)));
+        } catch {
           // ignore
         }
       }
     }
+  }, []);
+
+  useEffect(() => {
+    async function loadAttention() {
+      const token = localStorage.getItem("token");
+      try {
+        const [eventsResponse, paymentsResponse] = await Promise.all([
+          fetch(`${API_URL}/api/events`),
+          token ? fetch(`${API_URL}/api/payments`, { headers: { Authorization: `Bearer ${token}` } }) : Promise.resolve(null)
+        ]);
+        const events: ApiEvent[] = eventsResponse.ok ? await eventsResponse.json() : [];
+        const payments: ApiPayment[] = paymentsResponse?.ok ? await paymentsResponse.json() : [];
+        setAttention({
+          events: events.some((event) => !["aktif", "active"].includes((event.status || "").toLowerCase())),
+          transactions: payments.some((payment) => ["pending", "menunggu", "failed", "gagal", "rejected"].includes((payment.status || "").toLowerCase()))
+        });
+      } catch {
+        setAttention({ events: false, transactions: false });
+      }
+    }
+    void loadAttention();
   }, []);
 
   const isItemActive = (item: (typeof navItems)[0]) => {
@@ -142,17 +172,14 @@ export default function Sidebar({
         {/* Brand Header */}
         <div className={`relative flex items-center ${collapsed ? "justify-center px-2" : "justify-between px-5"} h-16 border-b border-white/10`}>
           <Link href="/Dashboard" className="flex items-center gap-3 overflow-hidden">
-            <div className="relative shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-white text-[#111844] shadow-xs">
-              <svg viewBox="0 0 24 24" className="w-5.5 h-5.5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M17 6.5C15.5 4.5 12.5 3.5 10 3.5C5.3 3.5 1.5 7.3 1.5 12C1.5 16.7 5.3 20.5 10 20.5C12.5 20.5 15.5 19.5 17 17.5"
-                  stroke="currentColor"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="14.5" cy="12" r="2" fill="currentColor" />
-              </svg>
+            <div className="relative shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-white/5 shadow-xs border border-white/10">
+              <Image
+                src="/images/concertix-logo.svg"
+                alt="Concertix Logo"
+                width={28}
+                height={28}
+                className="w-7 h-7 object-contain"
+              />
             </div>
 
             <AnimatePresence>
@@ -194,7 +221,7 @@ export default function Sidebar({
                 onClick={() => setMobileOpen(false)}
                 className={`relative flex items-center h-11 px-3.5 rounded-xl group transition-colors overflow-hidden ${
                   active
-                    ? "bg-white text-[#111844] font-bold shadow-xs"
+                    ? "sidebar-active bg-white text-[#111844] font-bold shadow-xs"
                     : "text-indigo-100 hover:text-white hover:bg-white/10"
                 }`}
               >
@@ -216,7 +243,7 @@ export default function Sidebar({
                 </AnimatePresence>
 
                 {/* Notification dot badge */}
-                {item.hasBadge && (
+                {item.badgeType && attention[item.badgeType] && (
                   <span className={`ml-auto w-2 h-2 rounded-full shrink-0 ${active ? "bg-rose-500" : "bg-rose-400"}`} />
                 )}
               </Link>

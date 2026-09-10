@@ -377,19 +377,24 @@ export default function TambahEventPage() {
                     <label className="block text-xs font-semibold text-slate-500">
                       Nama Kategori
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={cat.nama_kategori}
                       onChange={(e) =>
                         updateTicketCategory(i, "nama_kategori", e.target.value)
                       }
-                      placeholder="Reguler / VIP / VVIP"
                       className={`w-full px-3.5 py-2 text-xs sm:text-sm bg-white rounded-xl border ${
                         errors[`cat_name_${i}`]
                           ? "border-rose-400"
                           : "border-slate-200 focus:border-[#111844]"
                       } focus:outline-none transition`}
-                    />
+                    >
+                      <option value="">Pilih kategori tiket</option>
+                      <option value="Reguler">Reguler</option>
+                      <option value="VIP">VIP</option>
+                      <option value="VVIP">VVIP</option>
+                      <option value="Early Bird">Early Bird</option>
+                      <option value="Festival">Festival</option>
+                    </select>
                     {errors[`cat_name_${i}`] && (
                       <p className="text-xs text-rose-500">
                         {errors[`cat_name_${i}`]}

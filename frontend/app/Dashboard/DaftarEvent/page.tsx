@@ -85,7 +85,7 @@ export default function DaftarEventPage() {
       status: evt.status || "aktif"
     });
     setEditPoster(null);
-    setEditImagePreview(evt.poster ? `${API_URL}/uploads/events/${evt.poster}` : null);
+    setEditImagePreview(evt.poster ? `${API_URL}/uploads/posters/${evt.poster}` : null);
     setEditError("");
   }
 
@@ -280,10 +280,27 @@ export default function DaftarEventPage() {
                       >
                         {/* Event name + artis */}
                         <td className="py-4 px-6">
-                          <p className="font-bold text-slate-800 truncate max-w-[240px] text-sm group-hover:text-[#111844] transition-colors">
-                            {evt.judul}
-                          </p>
-                          <p className="text-slate-500 text-xs mt-0.5">{evt.nama_artis || "—"}</p>
+                          <div className="flex items-center gap-3 min-w-[220px]">
+                            {evt.poster ? (
+                              <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
+                                <Image
+                                  src={`${API_URL}/uploads/posters/${evt.poster}`}
+                                  alt={`Poster ${evt.judul || "event"}`}
+                                  fill
+                                  className="object-cover"
+                                  unoptimized
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-12 h-12 rounded-lg border border-dashed border-slate-200 bg-slate-50 shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-800 truncate max-w-[200px] text-sm group-hover:text-[#111844] transition-colors">
+                                {evt.judul}
+                              </p>
+                              <p className="text-slate-500 text-xs mt-0.5">{evt.nama_artis || "—"}</p>
+                            </div>
+                          </div>
                         </td>
 
                         {/* Date & time */}

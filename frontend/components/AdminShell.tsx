@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,7 +13,24 @@ interface AdminShellProps {
 export default function AdminShell({ children }: AdminShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("concertix_theme");
+    const shouldUseDark = savedTheme === "dark";
+    setDarkMode(shouldUseDark);
+    document.documentElement.dataset.theme = shouldUseDark ? "dark" : "light";
+  }, []);
+
+  const toggleTheme = () => {
+    setDarkMode((current) => {
+      const next = !current;
+      localStorage.setItem("concertix_theme", next ? "dark" : "light");
+      document.documentElement.dataset.theme = next ? "dark" : "light";
+      return next;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
@@ -32,7 +49,11 @@ export default function AdminShell({ children }: AdminShellProps) {
         }`}
       >
         {/* Top Navbar */}
-        <Navbar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} />
+        <Navbar
+          onMobileMenuToggle={() => setMobileOpen(!mobileOpen)}
+          darkMode={darkMode}
+          onThemeToggle={toggleTheme}
+        />
 
         {/* Page Content with Framer Motion Route Transition */}
         <main className="flex-1 p-5 sm:p-6 max-w-[1400px] w-full mx-auto">
