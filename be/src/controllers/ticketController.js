@@ -1,159 +1,136 @@
-const db = require("../config/db");
+const supabase = require("../config/supabase");
 
-// Tambah kategori tiket
-const tambahKategori = (req, res) => {
+const tambahKategori = async (req, res) => {
   const { event_id, nama_kategori, harga, stok } = req.body;
 
   if (!event_id || !nama_kategori || !harga || !stok) {
-    return res.status(400).json({
-      message: "Semua data harus diisi",
-    });
+    return res.status(400).json({ message: "Semua data harus diisi" });
   }
 
-  const cekEvent = "SELECT * FROM events WHERE id = ?";
+  try {
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .select("id")
+      .eq("id", event_id)
+      .maybeSingle();
 
-  db.query(cekEvent, [event_id], (err, result) => {
-    if (err) {
-      return res.status(500).json({
-        message: err.message,
-      });
+    if (eventError) throw eventError;
+    if (!event) {
+      return res.status(404).json({ message: "Event tidak ditemukan" });
     }
 
-    if (result.length === 0) {
-      return res.status(404).json({
-        message: "Event tidak ditemukan",
-      });
+    const { error } = await supabase.from("ticket_categories").insert({
+      event_id,
+      nama_kategori,
+      harga,
+      stok,
+    });
+
+    if (error) throw error;
+    return res.status(201).json({ message: "Kategori tiket berhasil ditambahkan" });
+  } catch (error) {
+    console.error("Gagal menambahkan kategori tiket:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+const getKategori = async (_req, res) => {
+  try {
+    const { data: categories, error } = await supabase
+      .from("ticket_categories")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (error) throw error;
+
+    const eventIds = [...new Set(categories.map((category) => category.event_id))];
+    let eventsById = new Map();
+
+    if (eventIds.length > 0) {
+      const { data: events, error: eventsError } = await supabase
+        .from("events")
+        .select("id, judul")
+        .in("id", eventIds);
+
+      if (eventsError) throw eventsError;
+      eventsById = new Map(events.map((event) => [String(event.id), event.judul]));
     }
 
-    const sql = `
-      INSERT INTO ticket_categories
-      (event_id, nama_kategori, harga, stok)
-      VALUES (?, ?, ?, ?)
-    `;
-
-    db.query(
-      sql,
-      [event_id, nama_kategori, harga, stok],
-      (err) => {
-        if (err) {
-          return res.status(500).json({
-            message: err.message,
-          });
-        }
-
-        res.status(201).json({
-          message: "Kategori tiket berhasil ditambahkan",
-        });
-      }
+    return res.json(
+      categories.map((category) => ({
+        ...category,
+        nama_event: eventsById.get(String(category.event_id)) ?? null,
+      }))
     );
-  });
+  } catch (error) {
+    console.error("Gagal mengambil kategori tiket:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
-// Semua kategori tiket
-const getKategori = (req, res) => {
-  const sql = `
-    SELECT
-      ticket_categories.*,
-      events.judul AS nama_event
-    FROM ticket_categories
-    JOIN events
-      ON ticket_categories.event_id = events.id
-    ORDER BY ticket_categories.id DESC
-  `;
+const getDetailKategori = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("ticket_categories")
+      .select("*")
+      .eq("id", req.params.id)
+      .maybeSingle();
 
-  db.query(sql, (err, result) => {
-    if (err) {
-      return res.status(500).json({
-        message: err.message,
-      });
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ message: "Kategori tiket tidak ditemukan" });
     }
-
-    res.json(result);
-  });
+    return res.json(data);
+  } catch (error) {
+    console.error("Gagal mengambil detail kategori tiket:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
-// Detail kategori tiket
-const getDetailKategori = (req, res) => {
-  const { id } = req.params;
-
-  db.query(
-    "SELECT * FROM ticket_categories WHERE id = ?",
-    [id],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({
-          message: err.message,
-        });
-      }
-
-      if (result.length === 0) {
-        return res.status(404).json({
-          message: "Kategori tiket tidak ditemukan",
-        });
-      }
-
-      res.json(result[0]);
-    }
-  );
-};
-
-// Update kategori tiket
-const updateKategori = (req, res) => {
-  const { id } = req.params;
+const updateKategori = async (req, res) => {
   const { event_id, nama_kategori, harga, stok } = req.body;
 
   if (!event_id || !nama_kategori || !harga || !stok) {
-    return res.status(400).json({
-      message: "Semua data harus diisi",
-    });
+    return res.status(400).json({ message: "Semua data harus diisi" });
   }
 
-  const sql = `
-    UPDATE ticket_categories
-    SET
-      event_id = ?,
-      nama_kategori = ?,
-      harga = ?,
-      stok = ?
-    WHERE id = ?
-  `;
+  try {
+    const { data, error } = await supabase
+      .from("ticket_categories")
+      .update({ event_id, nama_kategori, harga, stok })
+      .eq("id", req.params.id)
+      .select("id")
+      .maybeSingle();
 
-  db.query(
-    sql,
-    [event_id, nama_kategori, harga, stok, id],
-    (err) => {
-      if (err) {
-        return res.status(500).json({
-          message: err.message,
-        });
-      }
-
-      res.json({
-        message: "Kategori tiket berhasil diubah",
-      });
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ message: "Kategori tiket tidak ditemukan" });
     }
-  );
+    return res.json({ message: "Kategori tiket berhasil diubah" });
+  } catch (error) {
+    console.error("Gagal mengubah kategori tiket:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
-// Hapus kategori tiket
-const hapusKategori = (req, res) => {
-  const { id } = req.params;
+const hapusKategori = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("ticket_categories")
+      .delete()
+      .eq("id", req.params.id)
+      .select("id")
+      .maybeSingle();
 
-  db.query(
-    "DELETE FROM ticket_categories WHERE id = ?",
-    [id],
-    (err) => {
-      if (err) {
-        return res.status(500).json({
-          message: err.message,
-        });
-      }
-
-      res.json({
-        message: "Kategori tiket berhasil dihapus",
-      });
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ message: "Kategori tiket tidak ditemukan" });
     }
-  );
+    return res.json({ message: "Kategori tiket berhasil dihapus" });
+  } catch (error) {
+    console.error("Gagal menghapus kategori tiket:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
 module.exports = {

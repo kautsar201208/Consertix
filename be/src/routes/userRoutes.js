@@ -9,11 +9,11 @@ const {
 } = require("../controllers/userController");
 
 const auth = require("../middleware/authMiddleware");
+const admin = require("../middleware/adminMiddleware");
 
-// Semua route dilindungi oleh auth middleware
-router.get("/", auth, getAllUsers);
-router.get("/:id", auth, getUserById);
-router.put("/:id", auth, updateUserRole);
-router.delete("/:id", auth, deleteUser);
+router.get("/", auth, admin, getAllUsers);
+router.get("/:id", auth, admin, getUserById);
+router.put("/:id", auth, admin, updateUserRole);
+router.delete("/:id", auth, admin, deleteUser);
 
 module.exports = router;

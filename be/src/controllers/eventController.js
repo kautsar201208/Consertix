@@ -1,28 +1,19 @@
-const db = require("../config/db");
+const supabase = require("../config/supabase");
 
 const parseTicketCategories = (value) => {
-  if (!value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
     return [];
   }
-
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-      return [];
-    }
-  }
-
-  return [];
 };
 
-// Tambah Event
-const tambahEvent = (req, res) => {
+const tambahEvent = async (req, res) => {
   const {
     nama_artis,
     judul,
@@ -34,164 +25,141 @@ const tambahEvent = (req, res) => {
     ticket_categories: ticketCategoriesPayload,
   } = req.body;
 
-  const poster = req.file ? req.file.filename : null;
-  const created_by = req.user.id;
   const ticketCategories = parseTicketCategories(ticketCategoriesPayload);
+  const invalidCategory = ticketCategories.some((category) => {
+    const namaKategori = category?.nama_kategori?.trim();
+    return (
+      !namaKategori ||
+      category?.harga === "" ||
+      category?.harga === undefined ||
+      category?.harga === null ||
+      category?.stok === "" ||
+      category?.stok === undefined ||
+      category?.stok === null
+    );
+  });
 
-  if (
-    !nama_artis ||
-    !judul ||
-    !deskripsi ||
-    !tanggal ||
-    !jam ||
-    !lokasi
-  ) {
-    return res.status(400).json({
-      message: "Semua data harus diisi",
-    });
+  if (!nama_artis || !judul || !deskripsi || !tanggal || !jam || !lokasi) {
+    return res.status(400).json({ message: "Semua data harus diisi" });
   }
-
   if (ticketCategories.length === 0) {
     return res.status(400).json({
       message: "Minimal satu kategori tiket harus ditambahkan",
     });
   }
-
-  const invalidCategory = ticketCategories.find((category) => {
-    const namaKategori = category?.nama_kategori?.trim();
-    const harga = category?.harga;
-    const stok = category?.stok;
-
-    return !namaKategori || harga === "" || harga === undefined || harga === null || stok === "" || stok === undefined || stok === null;
-  });
-
   if (invalidCategory) {
     return res.status(400).json({
       message: "Semua kategori tiket harus memiliki nama, harga, dan stok",
     });
   }
 
-  const sql = `
-    INSERT INTO events
-    (nama_artis, judul, deskripsi, tanggal, jam, lokasi, poster, status, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
+  try {
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .insert({
+        nama_artis,
+        judul,
+        deskripsi,
+        tanggal,
+        jam,
+        lokasi,
+        poster: req.file ? req.file.filename : null,
+        status: status || "aktif",
+        created_by: req.user.id,
+      })
+      .select("id")
+      .single();
 
-  db.query(
-    sql,
-    [
-      nama_artis,
-      judul,
-      deskripsi,
-      tanggal,
-      jam,
-      lokasi,
-      poster,
-      status || "aktif",
-      created_by,
-    ],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({
-          message: err.message,
-        });
+    if (eventError) throw eventError;
+
+    const categories = ticketCategories.map((category) => ({
+      event_id: event.id,
+      nama_kategori: category.nama_kategori.trim(),
+      harga: Number(category.harga),
+      stok: Number(category.stok),
+    }));
+    const { error: categoriesError } = await supabase
+      .from("ticket_categories")
+      .insert(categories);
+
+    if (categoriesError) {
+      const { error: rollbackError } = await supabase
+        .from("events")
+        .delete()
+        .eq("id", event.id);
+      if (rollbackError) {
+        console.error("Gagal membatalkan event setelah kategori gagal:", rollbackError.message);
       }
-
-      const eventId = result.insertId;
-      const categorySql = `
-        INSERT INTO ticket_categories
-        (event_id, nama_kategori, harga, stok)
-        VALUES ${ticketCategories.map(() => "(?, ?, ?, ?)").join(", ")}
-      `;
-      const categoryValues = ticketCategories.flatMap((category) => [
-        eventId,
-        category.nama_kategori.trim(),
-        Number(category.harga),
-        Number(category.stok),
-      ]);
-
-      db.query(categorySql, categoryValues, (categoryErr) => {
-        if (categoryErr) {
-          return res.status(500).json({
-            message: categoryErr.message,
-          });
-        }
-
-        res.status(201).json({
-          message: "Event dan kategori tiket berhasil ditambahkan",
-        });
-      });
-    }
-  );
-};
-
-// Semua Event
-const getEvents = (req, res) => {
-  const sql = `
-    SELECT
-      events.*,
-      users.nama AS admin
-    FROM events
-    LEFT JOIN users
-    ON events.created_by = users.id
-    ORDER BY events.created_at DESC
-  `;
-
-  db.query(sql, (err, result) => {
-    if (err) {
-      return res.status(500).json({
-        message: err.message,
-      });
+      throw categoriesError;
     }
 
-    res.json(result);
-  });
+    return res.status(201).json({
+      message: "Event dan kategori tiket berhasil ditambahkan",
+    });
+  } catch (error) {
+    console.error("Gagal menambahkan event:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
-// Detail Event
-const getEvent = (req, res) => {
-  const { id } = req.params;
+const getEvents = async (_req, res) => {
+  try {
+    const { data: events, error } = await supabase
+      .from("events")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-  db.query(
-    "SELECT * FROM events WHERE id = ?",
-    [id],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({
-          message: err.message,
-        });
-      }
+    if (error) throw error;
 
-      if (result.length === 0) {
-        return res.status(404).json({
-          message: "Event tidak ditemukan",
-        });
-      }
-
-      db.query(
-        "SELECT id, nama_kategori, harga, stok FROM ticket_categories WHERE event_id = ? ORDER BY id ASC",
-        [id],
-        (categoryErr, categories) => {
-          if (categoryErr) {
-            return res.status(500).json({
-              message: categoryErr.message,
-            });
-          }
-
-          res.json({
-            ...result[0],
-            ticket_categories: categories,
-          });
-        }
-      );
+    const userIds = [...new Set(events.map((event) => event.created_by).filter(Boolean))];
+    let usersById = new Map();
+    if (userIds.length > 0) {
+      const { data: users, error: usersError } = await supabase
+        .from("users")
+        .select("id, nama")
+        .in("id", userIds);
+      if (usersError) throw usersError;
+      usersById = new Map(users.map((user) => [String(user.id), user.nama]));
     }
-  );
+
+    return res.json(
+      events.map((event) => ({
+        ...event,
+        admin: usersById.get(String(event.created_by)) ?? null,
+      }))
+    );
+  } catch (error) {
+    console.error("Gagal mengambil daftar event:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
-// Update Event
-const updateEvent = (req, res) => {
-  const { id } = req.params;
+const getEvent = async (req, res) => {
+  try {
+    const { data: event, error } = await supabase
+      .from("events")
+      .select("*")
+      .eq("id", req.params.id)
+      .maybeSingle();
 
+    if (error) throw error;
+    if (!event) return res.status(404).json({ message: "Event tidak ditemukan" });
+
+    const { data: categories, error: categoriesError } = await supabase
+      .from("ticket_categories")
+      .select("id, nama_kategori, harga, stok")
+      .eq("event_id", req.params.id)
+      .order("id", { ascending: true });
+
+    if (categoriesError) throw categoriesError;
+    return res.json({ ...event, ticket_categories: categories });
+  } catch (error) {
+    console.error("Gagal mengambil detail event:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+const updateEvent = async (req, res) => {
   const {
     nama_artis,
     judul,
@@ -203,52 +171,8 @@ const updateEvent = (req, res) => {
     ticket_categories: ticketCategoriesPayload,
   } = req.body;
 
-  const poster = req.file ? req.file.filename : null;
-
-  let sql = "";
-  let data = [];
-
-  if (poster) {
-    sql = `
-      UPDATE events
-      SET
-        nama_artis = ?,
-        judul = ?,
-        deskripsi = ?,
-        tanggal = ?,
-        jam = ?,
-        lokasi = ?,
-        poster = ?,
-        status = ?
-      WHERE id = ?
-    `;
-
-    data = [
-      nama_artis,
-      judul,
-      deskripsi,
-      tanggal,
-      jam,
-      lokasi,
-      poster,
-      status,
-      id,
-    ];
-  } else {
-    sql = `
-      UPDATE events
-      SET
-        nama_artis = ?,
-        judul = ?,
-        deskripsi = ?,
-        tanggal = ?,
-        jam = ?,
-        lokasi = ?,
-        status = ?
-      WHERE id = ?
-    `;
-
-    data = [
+  try {
+    const updates = {
       nama_artis,
       judul,
       deskripsi,
@@ -256,71 +180,66 @@ const updateEvent = (req, res) => {
       jam,
       lokasi,
       status,
-      id,
-    ];
-  }
+    };
+    if (req.file) updates.poster = req.file.filename;
 
-  db.query(sql, data, (err) => {
-    if (err) {
-      return res.status(500).json({
-        message: err.message,
-      });
-    }
+    const { data: event, error } = await supabase
+      .from("events")
+      .update(updates)
+      .eq("id", req.params.id)
+      .select("id")
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!event) return res.status(404).json({ message: "Event tidak ditemukan" });
 
     const ticketCategories = parseTicketCategories(ticketCategoriesPayload);
     if (ticketCategories.length === 0) {
       return res.json({ message: "Event berhasil diubah" });
     }
 
-    let pending = ticketCategories.length;
-    let categoryError = null;
-    ticketCategories.forEach((category) => {
-      const categoryValues = [
-        category.nama_kategori.trim(),
-        Number(category.harga),
-        Number(category.stok),
-        id,
-      ];
-      const categorySql = category.id
-        ? "UPDATE ticket_categories SET nama_kategori = ?, harga = ?, stok = ? WHERE id = ? AND event_id = ?"
-        : "INSERT INTO ticket_categories (event_id, nama_kategori, harga, stok) VALUES (?, ?, ?, ?)";
-      const values = category.id
-        ? [...categoryValues, id]
-        : [id, ...categoryValues.slice(0, 3)];
+    for (const category of ticketCategories) {
+      const values = {
+        nama_kategori: category.nama_kategori.trim(),
+        harga: Number(category.harga),
+        stok: Number(category.stok),
+      };
+      const result = category.id
+        ? await supabase
+            .from("ticket_categories")
+            .update(values)
+            .eq("id", category.id)
+            .eq("event_id", req.params.id)
+        : await supabase
+            .from("ticket_categories")
+            .insert({ ...values, event_id: req.params.id });
 
-      db.query(categorySql, values, (updateErr) => {
-        if (updateErr) categoryError = updateErr;
-        pending -= 1;
-        if (pending === 0) {
-          if (categoryError) {
-            return res.status(500).json({ message: categoryError.message });
-          }
-          res.json({ message: "Event dan kategori tiket berhasil diubah" });
-        }
-      });
-    });
-  });
+      if (result.error) throw result.error;
+    }
+
+    return res.json({ message: "Event dan kategori tiket berhasil diubah" });
+  } catch (error) {
+    console.error("Gagal mengubah event:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
-// Hapus Event
-const hapusEvent = (req, res) => {
-  const { id } = req.params;
+const hapusEvent = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("events")
+      .delete()
+      .eq("id", req.params.id)
+      .select("id")
+      .maybeSingle();
 
-  db.query(
-    "DELETE FROM events WHERE id = ?",
-    [id],
-    (err) => {
-      if (err) {
-        return res.status(500).json({
-          message: err.message,
-        });
-      }
-
-      res.json({
-        message: "Event berhasil dihapus",
-      });
-    }
-  );
+    if (error) throw error;
+    if (!data) return res.status(404).json({ message: "Event tidak ditemukan" });
+    return res.json({ message: "Event berhasil dihapus" });
+  } catch (error) {
+    console.error("Gagal menghapus event:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
 module.exports = {

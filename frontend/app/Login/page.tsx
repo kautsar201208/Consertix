@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
@@ -21,6 +20,8 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     setSuccess("");
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
 
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
@@ -35,6 +36,15 @@ export default function LoginPage() {
 
       if (!response.ok) {
         throw new Error(data.message || "Login gagal");
+      }
+
+      const role = String(data.user?.role ?? "").trim().toLowerCase();
+      const isAdmin = ["admin", "administrator", "superadmin"].includes(role);
+      if (!isAdmin) {
+        if (role === "user") {
+          throw new Error("Akun user hanya dapat digunakan melalui aplikasi mobile.");
+        }
+        throw new Error("Role akun tidak dikenali.");
       }
 
       localStorage.setItem("token", data.token);
@@ -79,7 +89,7 @@ export default function LoginPage() {
             </p>
           </div>
           <div className="rounded-xl bg-white/10 p-4 text-xs backdrop-blur border border-white/10 text-indigo-100">
-            Gunakan kredensial admin Anda untuk mengakses dashboard manajemen event.
+            Gunakan kredensial admin untuk mengakses dashboard manajemen event.
           </div>
         </section>
 
@@ -88,7 +98,7 @@ export default function LoginPage() {
             <p className="mb-1.5 text-xs font-bold text-[#111844] uppercase tracking-wider">Welcome back</p>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Admin Sign In</h2>
             <p className="mt-1.5 text-xs text-slate-500">
-              Silakan masukkan kredensial Anda untuk mengakses panel manajemen.
+              Masukkan kredensial admin untuk mengakses panel manajemen.
             </p>
 
             <form onSubmit={handleLogin} className="mt-8 space-y-4">
@@ -144,10 +154,7 @@ export default function LoginPage() {
             </form>
 
             <p className="mt-6 text-center text-xs text-slate-500">
-              Belum punya akun admin?{" "}
-              <Link href="/Register" className="font-semibold text-[#111844] hover:underline">
-                Daftar di sini
-              </Link>
+              Akun user hanya dapat digunakan melalui aplikasi mobile.
             </p>
           </div>
         </section>
