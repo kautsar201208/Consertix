@@ -4,8 +4,6 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
-require("./config/db");
-
 const authRoutes = require("./routes/authRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const ticketRoutes = require("./routes/ticketRoutes");

@@ -1,7 +1,8 @@
-const db = require("../config/db");
 
-// Buat Pesanan
-const buatPesanan = (req, res) => {
+const supabase = require("../config/supabase");
+
+// Membuat pesanan
+const buatPesanan = async (req, res) => {
   const {
     ticket_category_id,
     jumlah_tiket,
@@ -12,8 +13,11 @@ const buatPesanan = (req, res) => {
     id_number,
     date_birth,
   } = req.body;
+
+  const quantity = Number(jumlah_tiket);
   const user_id = req.user.id;
 
+  // Validasi data pemesan
   if (
     !ticket_category_id ||
     !jumlah_tiket ||
@@ -29,122 +33,221 @@ const buatPesanan = (req, res) => {
     });
   }
 
-  db.query(
-    "SELECT * FROM ticket_categories WHERE id = ?",
-    [ticket_category_id],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({
-          message: err.message,
-        });
-      }
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    return res.status(400).json({
+      message: "Jumlah tiket tidak valid",
+    });
+  }
 
-      if (result.length === 0) {
-        return res.status(404).json({
-          message: "Kategori tiket tidak ditemukan",
-        });
-      }
+  try {
+    // Ambil data kategori tiket
+    const { data: ticket, error: ticketError } = await supabase
+      .from("ticket_categories")
+      .select("id, harga, stok")
+      .eq("id", ticket_category_id)
+      .maybeSingle();
 
-      const tiket = result[0];
+    if (ticketError) throw ticketError;
 
-      if (jumlah_tiket > tiket.stok) {
-        return res.status(400).json({
-          message: "Stok tiket tidak mencukupi",
-        });
-      }
-
-      const total_harga = tiket.harga * jumlah_tiket;
-
-      db.query(
-        `INSERT INTO orders
-        (user_id, ticket_category_id, jumlah_tiket, total_harga,
-         first_name, last_name, email, phone, id_number, date_birth)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          user_id,
-          ticket_category_id,
-          jumlah_tiket,
-          total_harga,
-          first_name,
-          last_name,
-          email,
-          phone,
-          id_number,
-          date_birth,
-        ],
-        (err) => {
-          if (err) {
-            return res.status(500).json({
-              message: err.message,
-            });
-          }
-
-          db.query(
-            "UPDATE ticket_categories SET stok = stok - ? WHERE id = ?",
-            [jumlah_tiket, ticket_category_id]
-          );
-
-          res.status(201).json({
-            message: "Pesanan berhasil dibuat",
-          });
-        }
-      );
-    }
-  );
-};
-
-// Riwayat Pesanan User
-const riwayatPesanan = (req, res) => {
-  const user_id = req.user.id;
-
-  const sql = `
-    SELECT
-      orders.*,
-      ticket_categories.nama_kategori,
-      events.judul
-    FROM orders
-    JOIN ticket_categories
-      ON orders.ticket_category_id = ticket_categories.id
-    JOIN events
-      ON ticket_categories.event_id = events.id
-    WHERE orders.user_id = ?
-    ORDER BY orders.created_at DESC
-  `;
-
-  db.query(sql, [user_id], (err, result) => {
-    if (err) {
-      return res.status(500).json({
-        message: err.message,
+    if (!ticket) {
+      return res.status(404).json({
+        message: "Kategori tiket tidak ditemukan",
       });
     }
 
-    res.json(result);
-  });
+    // Validasi stok tiket
+    if (quantity > ticket.stok) {
+      return res.status(400).json({
+        message: "Stok tiket tidak mencukupi",
+      });
+    }
+
+    const total_harga = ticket.harga * quantity;
+
+    // Simpan pesanan ke Supabase
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .insert({
+        user_id,
+        ticket_category_id,
+        jumlah_tiket: quantity,
+        total_harga,
+        first_name,
+        last_name,
+        email,
+        phone,
+        id_number,
+        date_birth,
+      })
+      .select("id")
+      .single();
+
+    if (orderError) throw orderError;
+
+    // Kurangi stok dengan pengecekan stok sebelumnya
+    const { data: updatedTicket, error: stockError } = await supabase
+      .from("ticket_categories")
+      .update({
+        stok: ticket.stok - quantity,
+      })
+      .eq("id", ticket_category_id)
+      .eq("stok", ticket.stok)
+      .gte("stok", quantity)
+      .select("id")
+      .maybeSingle();
+
+    // Jika stok gagal diperbarui, batalkan pesanan
+    if (stockError || !updatedTicket) {
+      const { error: rollbackError } = await supabase
+        .from("orders")
+        .delete()
+        .eq("id", order.id);
+
+      if (rollbackError) {
+        console.error(
+          "Gagal membatalkan pesanan:",
+          rollbackError.message
+        );
+      }
+
+      if (stockError) throw stockError;
+
+      return res.status(400).json({
+        message: "Stok tiket tidak mencukupi",
+      });
+    }
+
+    return res.status(201).json({
+      message: "Pesanan berhasil dibuat",
+    });
+  } catch (error) {
+    console.error("Gagal membuat pesanan:", error.message);
+
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
 };
 
-// Detail Pesanan
-const detailPesanan = (req, res) => {
-  const { id } = req.params;
+// Mengambil riwayat pesanan
+const riwayatPesanan = async (req, res) => {
+  try {
+    const { data: orders, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false });
 
-  db.query(
-    "SELECT * FROM orders WHERE id = ?",
-    [id],
-    (err, result) => {
-      if (err) {
-        return res.status(500).json({
-          message: err.message,
-        });
-      }
+    if (error) throw error;
 
-      if (result.length === 0) {
-        return res.status(404).json({
-          message: "Pesanan tidak ditemukan",
-        });
-      }
-
-      res.json(result[0]);
+    if (!orders || orders.length === 0) {
+      return res.json([]);
     }
-  );
+
+    const categoryIds = [
+      ...new Set(
+        orders.map((order) => order.ticket_category_id)
+      ),
+    ];
+
+    const { data: categories, error: categoriesError } =
+      await supabase
+        .from("ticket_categories")
+        .select("id, event_id, nama_kategori")
+        .in("id", categoryIds);
+
+    if (categoriesError) throw categoriesError;
+
+    const eventIds = [
+      ...new Set(
+        categories.map((category) => category.event_id)
+      ),
+    ];
+
+    let events = [];
+
+    if (eventIds.length > 0) {
+      const { data, error: eventsError } = await supabase
+        .from("events")
+        .select("id, judul")
+        .in("id", eventIds);
+
+      if (eventsError) throw eventsError;
+
+      events = data || [];
+    }
+
+    const categoriesById = new Map(
+      categories.map((category) => [
+        String(category.id),
+        category,
+      ])
+    );
+
+    const eventsById = new Map(
+      events.map((event) => [
+        String(event.id),
+        event,
+      ])
+    );
+
+    const result = orders.map((order) => {
+      const category = categoriesById.get(
+        String(order.ticket_category_id)
+      );
+
+      const event =
+        category &&
+        eventsById.get(String(category.event_id));
+
+      return {
+        ...order,
+        nama_kategori: category?.nama_kategori ?? null,
+        judul: event?.judul ?? null,
+      };
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error(
+      "Gagal mengambil riwayat pesanan:",
+      error.message
+    );
+
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+// Mengambil detail pesanan
+const detailPesanan = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", req.params.id)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({
+        message: "Pesanan tidak ditemukan",
+      });
+    }
+
+    return res.json(data);
+  } catch (error) {
+    console.error(
+      "Gagal mengambil detail pesanan:",
+      error.message
+    );
+
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
 };
 
 module.exports = {

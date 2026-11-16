@@ -1,63 +1,45 @@
-const db = require("../config/db");
+const supabase = require("../config/supabase");
 
-const dashboard = (req, res) => {
-  const data = {};
+const dashboard = async (_req, res) => {
+  try {
+    const tables = ["users", "events", "ticket_categories", "orders", "payments"];
+    const countResults = await Promise.all(
+      tables.map((table) =>
+        supabase.from(table).select("id", { count: "exact", head: true })
+      )
+    );
 
-  db.query("SELECT COUNT(*) AS totalUser FROM users", (err, user) => {
-    if (err) return res.status(500).json({ message: err.message });
+    const countError = countResults.find((result) => result.error);
+    if (countError) throw countError.error;
 
-    data.totalUser = user[0].totalUser;
+    let totalPendapatan = 0;
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("total_harga")
+        .range(offset, offset + pageSize - 1);
 
-    db.query("SELECT COUNT(*) AS totalEvent FROM events", (err, event) => {
-      if (err) return res.status(500).json({ message: err.message });
-
-      data.totalEvent = event[0].totalEvent;
-
-      db.query(
-        "SELECT COUNT(*) AS totalKategori FROM ticket_categories",
-        (err, kategori) => {
-          if (err) return res.status(500).json({ message: err.message });
-
-          data.totalKategori = kategori[0].totalKategori;
-
-          db.query(
-            "SELECT COUNT(*) AS totalOrder FROM orders",
-            (err, order) => {
-              if (err)
-                return res.status(500).json({ message: err.message });
-
-              data.totalOrder = order[0].totalOrder;
-
-              db.query(
-                "SELECT COUNT(*) AS totalPayment FROM payments",
-                (err, payment) => {
-                  if (err)
-                    return res.status(500).json({ message: err.message });
-
-                  data.totalPayment = payment[0].totalPayment;
-
-                  db.query(
-                    "SELECT SUM(total_harga) AS totalPendapatan FROM orders",
-                    (err, pendapatan) => {
-                      if (err)
-                        return res.status(500).json({
-                          message: err.message,
-                        });
-
-                      data.totalPendapatan =
-                        pendapatan[0].totalPendapatan || 0;
-
-                      res.json(data);
-                    }
-                  );
-                }
-              );
-            }
-          );
-        }
+      if (error) throw error;
+      totalPendapatan += data.reduce(
+        (total, order) => total + Number(order.total_harga || 0),
+        0
       );
+      if (data.length < pageSize) break;
+    }
+
+    return res.json({
+      totalUser: countResults[0].count ?? 0,
+      totalEvent: countResults[1].count ?? 0,
+      totalKategori: countResults[2].count ?? 0,
+      totalOrder: countResults[3].count ?? 0,
+      totalPayment: countResults[4].count ?? 0,
+      totalPendapatan,
     });
-  });
+  } catch (error) {
+    console.error("Gagal memuat dashboard:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
 module.exports = {
