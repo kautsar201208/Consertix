@@ -37,6 +37,8 @@ export default function EditEventPage() {
     deskripsi: "",
     tanggal: "",
     jam: "",
+    jam_selesai: "",
+    open_gate: "",
     lokasi: "",
     status: "aktif"
   });
@@ -70,6 +72,8 @@ export default function EditEventPage() {
           deskripsi: data.deskripsi || "",
           tanggal: data.tanggal ? data.tanggal.slice(0, 10) : "",
           jam: data.jam || "",
+          jam_selesai: data.jam_selesai || "",
+          open_gate: data.open_gate || "",
           lokasi: data.lokasi || "",
           status: data.status || "aktif"
         });
@@ -147,6 +151,8 @@ export default function EditEventPage() {
       formData.append("deskripsi", form.deskripsi);
       formData.append("tanggal", form.tanggal);
       formData.append("jam", form.jam);
+      if (form.jam_selesai) formData.append("jam_selesai", form.jam_selesai);
+      if (form.open_gate) formData.append("open_gate", form.open_gate);
       formData.append("lokasi", form.lokasi);
       formData.append("status", form.status);
       formData.append(
@@ -287,7 +293,76 @@ export default function EditEventPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Section 1: Info Event & Artis */}
+          {/* Section 1: Poster */}
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5 space-y-3">
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
+              Poster Event{" "}
+              <span className="text-slate-300 font-normal normal-case">
+                (kosongkan jika tidak ingin mengubah)
+              </span>
+            </h3>
+
+            {/* Show existing poster */}
+            {existingPoster && !imagePreview && (
+              <div className="space-y-2">
+                <p className="text-[11px] text-slate-500">Poster saat ini:</p>
+                <div className="relative w-full h-44 rounded-lg overflow-hidden border border-slate-200">
+                  <Image
+                    src={`${API_URL}/uploads/events/${existingPoster}`}
+                    alt="Poster Event"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                    onError={() => setExistingPoster(null)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setExistingPoster(null)}
+                    className="absolute top-2 right-2 p-1 bg-white/90 text-slate-700 rounded-lg shadow z-10 hover:bg-white transition"
+                    title="Hapus poster"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Upload new poster */}
+            <div className="relative border-2 border-dashed border-slate-200 hover:border-[#111844] rounded-xl p-5 text-center bg-slate-50/60 transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+              />
+              {imagePreview ? (
+                <div className="relative w-full h-44 rounded-lg overflow-hidden border border-slate-200">
+                  <Image src={imagePreview} alt="Preview Poster Baru" fill className="object-cover" unoptimized />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImagePreview(null);
+                      setPoster(null);
+                    }}
+                    className="absolute top-2 right-2 p-1 bg-white/90 text-slate-700 rounded-lg shadow z-20 hover:bg-white transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5 py-2">
+                  <Upload className="w-5 h-5 text-slate-400 mx-auto" />
+                  <p className="text-xs font-semibold text-slate-600">
+                    {existingPoster ? "Klik untuk ganti poster" : "Klik untuk upload poster baru"}
+                  </p>
+                  <p className="text-[11px] text-slate-400">PNG, JPG, atau WEBP</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section 2: Info Event & Artis */}
           <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5 space-y-4">
             <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
               Informasi Event & Artis
@@ -389,6 +464,32 @@ export default function EditEventPage() {
 
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-slate-700">
+                  Jam Selesai <span className="text-slate-400 font-normal">(opsional)</span>
+                </label>
+                <input
+                  type="time"
+                  value={form.jam_selesai}
+                  onChange={(e) => setForm({ ...form, jam_selesai: e.target.value })}
+                  className={inputClass("jam_selesai")}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Open Gate <span className="text-slate-400 font-normal">(opsional)</span>
+                </label>
+                <input
+                  type="time"
+                  value={form.open_gate}
+                  onChange={(e) => setForm({ ...form, open_gate: e.target.value })}
+                  className={inputClass("open_gate")}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-700">
                   Status Event
                 </label>
                 <select
@@ -470,75 +571,6 @@ export default function EditEventPage() {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Section 4: Poster */}
-          <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5 space-y-3">
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
-              Poster Event{" "}
-              <span className="text-slate-300 font-normal normal-case">
-                (kosongkan jika tidak ingin mengubah)
-              </span>
-            </h3>
-
-            {/* Show existing poster */}
-            {existingPoster && !imagePreview && (
-              <div className="space-y-2">
-                <p className="text-[11px] text-slate-500">Poster saat ini:</p>
-                <div className="relative w-full h-44 rounded-lg overflow-hidden border border-slate-200">
-                  <Image
-                    src={`${API_URL}/uploads/events/${existingPoster}`}
-                    alt="Poster Event"
-                    fill
-                    className="object-cover"
-                    unoptimized
-                    onError={() => setExistingPoster(null)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setExistingPoster(null)}
-                    className="absolute top-2 right-2 p-1 bg-white/90 text-slate-700 rounded-lg shadow z-10 hover:bg-white transition"
-                    title="Hapus poster"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Upload new poster */}
-            <div className="relative border-2 border-dashed border-slate-200 hover:border-[#111844] rounded-xl p-5 text-center bg-slate-50/60 transition-colors">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="absolute inset-0 opacity-0 cursor-pointer z-10"
-              />
-              {imagePreview ? (
-                <div className="relative w-full h-44 rounded-lg overflow-hidden border border-slate-200">
-                  <Image src={imagePreview} alt="Preview Poster Baru" fill className="object-cover" unoptimized />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setImagePreview(null);
-                      setPoster(null);
-                    }}
-                    className="absolute top-2 right-2 p-1 bg-white/90 text-slate-700 rounded-lg shadow z-20 hover:bg-white transition"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-1.5 py-2">
-                  <Upload className="w-5 h-5 text-slate-400 mx-auto" />
-                  <p className="text-xs font-semibold text-slate-600">
-                    {existingPoster ? "Klik untuk ganti poster" : "Klik untuk upload poster baru"}
-                  </p>
-                  <p className="text-[11px] text-slate-400">PNG, JPG, atau WEBP</p>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Submit Actions */}

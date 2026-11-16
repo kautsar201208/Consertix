@@ -37,6 +37,8 @@ export default function TambahEventPage() {
     syarat_ketentuan: "",
     tanggal: "",
     jam: "",
+    jam_selesai: "",
+    open_gate: "",
     lokasi: "",
     status: "aktif"
   });
@@ -128,6 +130,8 @@ export default function TambahEventPage() {
       }
       formData.append("tanggal", form.tanggal);
       formData.append("jam", form.jam);
+      if (form.jam_selesai) formData.append("jam_selesai", form.jam_selesai);
+      if (form.open_gate) formData.append("open_gate", form.open_gate);
       formData.append("lokasi", form.lokasi);
       formData.append("status", form.status);
       formData.append(
@@ -372,6 +376,33 @@ export default function TambahEventPage() {
                 {errors.jam && (
                   <p className="text-xs text-rose-500">{errors.jam}</p>
                 )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700">
+                  Jam Selesai <span className="text-slate-400 font-normal">(opsional)</span>
+                </label>
+                <input
+                  type="time"
+                  value={form.jam_selesai}
+                  onChange={(e) => setForm({ ...form, jam_selesai: e.target.value })}
+                  className={inputClass("jam_selesai")}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700">
+                  Open Gate <span className="text-slate-400 font-normal">(opsional)</span>
+                </label>
+                <input
+                  type="time"
+                  value={form.open_gate}
+                  onChange={(e) => setForm({ ...form, open_gate: e.target.value })}
+                  className={inputClass("open_gate")}
+                  placeholder="Jam pintu dibuka"
+                />
               </div>
 
               <div className="space-y-1.5">

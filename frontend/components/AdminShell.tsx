@@ -22,12 +22,30 @@ export default function AdminShell({ children }: AdminShellProps) {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const savedUserStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
 
     if (!token) {
-      localStorage.removeItem("user");
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("user");
+      }
       router.replace("/Login");
       return;
+    }
+
+    // Jika sudah ada sesi admin valid di localStorage, langsung authorize agar saat refresh TIDAK mental ke Login
+    let isCachedAdmin = false;
+    if (savedUserStr) {
+      try {
+        const savedUser = JSON.parse(savedUserStr);
+        const role = String(savedUser?.role ?? "").trim().toLowerCase();
+        if (["admin", "administrator", "superadmin"].includes(role)) {
+          isCachedAdmin = true;
+          setAuthorized(true);
+        }
+      } catch {
+        // Abaikan parse error, verifikasi API akan tetap berjalan
+      }
     }
 
     const verifyAdminAccess = async () => {
@@ -36,26 +54,32 @@ export default function AdminShell({ children }: AdminShellProps) {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (!response.ok) {
+        // Hanya redirect ke login jika token benar-benar tidak valid / expired dari server
+        if (response.status === 401 || response.status === 403) {
           localStorage.removeItem("token");
           localStorage.removeItem("user");
           router.replace("/Login");
           return;
         }
 
-        const user = await response.json();
-        const role = String(user?.role ?? "").trim().toLowerCase();
-        if (!["admin", "administrator", "superadmin"].includes(role)) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          router.replace("/Login");
-          return;
-        }
+        if (response.ok) {
+          const user = await response.json();
+          const role = String(user?.role ?? "").trim().toLowerCase();
+          if (!["admin", "administrator", "superadmin"].includes(role)) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            router.replace("/Login");
+            return;
+          }
 
-        localStorage.setItem("user", JSON.stringify(user));
-        setAuthorized(true);
+          localStorage.setItem("user", JSON.stringify(user));
+          setAuthorized(true);
+        }
       } catch {
-        setAuthError("Tidak dapat memverifikasi akses admin. Pastikan backend berjalan.");
+        // Jika jaringan sedang lambat atau offline, tetap pertahankan akses jika sesi lokal valid
+        if (!isCachedAdmin) {
+          setAuthError("Tidak dapat memverifikasi akses admin. Pastikan backend berjalan.");
+        }
       }
     };
 

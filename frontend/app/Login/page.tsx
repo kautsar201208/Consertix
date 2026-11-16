@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
@@ -13,6 +13,25 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Jika sudah login dan memiliki token admin aktif, langsung arahkan ke Dashboard (tidak perlu login ulang saat refresh)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("token");
+      const userStr = localStorage.getItem("user");
+      if (token && userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          const role = String(user?.role ?? "").trim().toLowerCase();
+          if (["admin", "administrator", "superadmin"].includes(role)) {
+            router.replace("/Dashboard");
+          }
+        } catch {
+          // abaikan jika parsing gagal
+        }
+      }
+    }
+  }, [router]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
