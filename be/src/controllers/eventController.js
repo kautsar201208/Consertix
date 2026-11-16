@@ -1,5 +1,13 @@
 const supabase = require("../config/supabase");
 
+const isMissingColumnError = (err, column) =>
+  Boolean(
+    err &&
+      (err.code === "PGRST204" ||
+        err.code === "42703" ||
+        (typeof err.message === "string" && err.message.includes(column)))
+  );
+
 const parseTicketCategories = (value) => {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -18,6 +26,7 @@ const tambahEvent = async (req, res) => {
     nama_artis,
     judul,
     deskripsi,
+    syarat_ketentuan,
     tanggal,
     jam,
     lokasi,
@@ -54,23 +63,43 @@ const tambahEvent = async (req, res) => {
   }
 
   try {
-    const { data: event, error: eventError } = await supabase
+    const finalDeskripsi =
+      syarat_ketentuan && syarat_ketentuan.trim()
+        ? `${deskripsi}\n\nSyarat dan Ketentuan:\n${syarat_ketentuan.trim()}`
+        : deskripsi;
+
+    const baseEventData = {
+      nama_artis,
+      judul,
+      deskripsi: finalDeskripsi,
+      tanggal,
+      jam,
+      lokasi,
+      poster: req.file ? req.file.filename : null,
+      status: status || "aktif",
+      created_by: req.user.id,
+    };
+
+    let eventResult = await supabase
       .from("events")
-      .insert({
-        nama_artis,
-        judul,
-        deskripsi,
-        tanggal,
-        jam,
-        lokasi,
-        poster: req.file ? req.file.filename : null,
-        status: status || "aktif",
-        created_by: req.user.id,
-      })
+      .insert(
+        syarat_ketentuan && syarat_ketentuan.trim()
+          ? { ...baseEventData, syarat_ketentuan: syarat_ketentuan.trim() }
+          : baseEventData
+      )
       .select("id")
       .single();
 
-    if (eventError) throw eventError;
+    if (isMissingColumnError(eventResult.error, "syarat_ketentuan")) {
+      eventResult = await supabase
+        .from("events")
+        .insert(baseEventData)
+        .select("id")
+        .single();
+    }
+
+    if (eventResult.error) throw eventResult.error;
+    const event = eventResult.data;
 
     const categories = ticketCategories.map((category) => ({
       event_id: event.id,
@@ -164,6 +193,7 @@ const updateEvent = async (req, res) => {
     nama_artis,
     judul,
     deskripsi,
+    syarat_ketentuan,
     tanggal,
     jam,
     lokasi,
@@ -172,10 +202,15 @@ const updateEvent = async (req, res) => {
   } = req.body;
 
   try {
+    const finalDeskripsi =
+      syarat_ketentuan && syarat_ketentuan.trim()
+        ? `${deskripsi}\n\nSyarat dan Ketentuan:\n${syarat_ketentuan.trim()}`
+        : deskripsi;
+
     const updates = {
       nama_artis,
       judul,
-      deskripsi,
+      deskripsi: finalDeskripsi,
       tanggal,
       jam,
       lokasi,
@@ -183,14 +218,28 @@ const updateEvent = async (req, res) => {
     };
     if (req.file) updates.poster = req.file.filename;
 
-    const { data: event, error } = await supabase
+    let eventResult = await supabase
       .from("events")
-      .update(updates)
+      .update(
+        syarat_ketentuan && syarat_ketentuan.trim()
+          ? { ...updates, syarat_ketentuan: syarat_ketentuan.trim() }
+          : updates
+      )
       .eq("id", req.params.id)
       .select("id")
       .maybeSingle();
 
-    if (error) throw error;
+    if (isMissingColumnError(eventResult.error, "syarat_ketentuan")) {
+      eventResult = await supabase
+        .from("events")
+        .update(updates)
+        .eq("id", req.params.id)
+        .select("id")
+        .maybeSingle();
+    }
+
+    if (eventResult.error) throw eventResult.error;
+    const event = eventResult.data;
     if (!event) return res.status(404).json({ message: "Event tidak ditemukan" });
 
     const ticketCategories = parseTicketCategories(ticketCategoriesPayload);

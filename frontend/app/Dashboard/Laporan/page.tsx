@@ -27,7 +27,12 @@ export default function LaporanPage() {
 
   const handleExport = (type: "PDF" | "Excel") => {
     setIsExporting(true);
-    s2
+    setTimeout(() => {
+      setIsExporting(false);
+      setExportSuccess(`Laporan_${dateRange.replace(" ", "_")}.${type.toLowerCase()}`);
+      setTimeout(() => setExportSuccess(null), 4000);
+    }, 1200);
+  };
 
   return (
     <AdminShell>
@@ -38,13 +43,7 @@ export default function LaporanPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Analytics & Reports</h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Pantaunce } from "framer-motion";
-import { MOCK_REVENUE_7_DAYS } from "@/lib/mockData";
-
-export default function LaporanPage() {
-  const  [dateRange, setDateRange] = useState("Bulan Ini");
-  const [isExporting, setIsExporting] = useState(false);
- kinerja penjualan tiket dan pendapatan event.
+              Pantau kinerja penjualan tiket dan pendapatan event.
             </p>
           </div>
           <div className="flex items-center gap-2.5">

@@ -34,6 +34,7 @@ export default function TambahEventPage() {
     nama_artis: "",
     judul: "",
     deskripsi: "",
+    syarat_ketentuan: "",
     tanggal: "",
     jam: "",
     lokasi: "",
@@ -122,6 +123,9 @@ export default function TambahEventPage() {
       formData.append("nama_artis", form.nama_artis);
       formData.append("judul", form.judul);
       formData.append("deskripsi", form.deskripsi);
+      if (form.syarat_ketentuan.trim()) {
+        formData.append("syarat_ketentuan", form.syarat_ketentuan.trim());
+      }
       formData.append("tanggal", form.tanggal);
       formData.append("jam", form.jam);
       formData.append("lokasi", form.lokasi);
@@ -215,7 +219,49 @@ export default function TambahEventPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Section 1: Informasi Event & Artis */}
+          {/* Section: Upload Poster (Paling Atas) */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-3">
+              Poster Event <span className="text-slate-300 font-normal normal-case">(opsional)</span>
+            </h3>
+
+            <div className="relative border-2 border-dashed border-slate-200 hover:border-[#111844] rounded-2xl p-6 text-center bg-slate-50/60 transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+              />
+              {imagePreview ? (
+                <div className="relative w-full h-48 rounded-xl overflow-hidden border border-slate-200">
+                  <Image src={imagePreview} alt="Preview Poster" fill className="object-cover" unoptimized />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImagePreview(null);
+                      setPoster(null);
+                    }}
+                    className="absolute top-2 right-2 p-1.5 bg-white/90 text-slate-700 rounded-lg shadow z-20 hover:bg-white transition"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2 py-3">
+                  <Upload className="w-6 h-6 text-slate-400 mx-auto" />
+                  <p className="text-xs sm:text-sm font-semibold text-slate-700">
+                    Klik untuk upload poster
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Mendukung PNG, JPG, WEBP — maks 5MB
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section: Informasi Event & Artis */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-5">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-3">
               Informasi Event & Artis
@@ -267,7 +313,7 @@ export default function TambahEventPage() {
                 rows={4}
                 value={form.deskripsi}
                 onChange={(e) => setForm({ ...form, deskripsi: e.target.value })}
-                placeholder="Tuliskan deskripsi lengkap event, syarat masuk, peraturan venue, dll..."
+                placeholder="Tuliskan deskripsi lengkap event..."
                 className={`${inputClass("deskripsi")} resize-none`}
               />
               {errors.deskripsi && (
@@ -275,6 +321,19 @@ export default function TambahEventPage() {
                   <AlertCircle className="w-3.5 h-3.5" /> {errors.deskripsi}
                 </p>
               )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs sm:text-sm font-semibold text-slate-700">
+                Syarat dan Ketentuan <span className="text-slate-400 font-normal">(opsional)</span>
+              </label>
+              <textarea
+                rows={4}
+                value={form.syarat_ketentuan}
+                onChange={(e) => setForm({ ...form, syarat_ketentuan: e.target.value })}
+                placeholder="Tuliskan syarat dan ketentuan event, batasan usia, peraturan venue, barang bawaan yang dilarang, aturan tiket, dll..."
+                className={`${inputClass("syarat_ketentuan")} resize-none`}
+              />
             </div>
           </div>
 
@@ -465,48 +524,6 @@ export default function TambahEventPage() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Section 4: Upload Poster */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-3">
-              Poster Event <span className="text-slate-300 font-normal normal-case">(opsional)</span>
-            </h3>
-
-            <div className="relative border-2 border-dashed border-slate-200 hover:border-[#111844] rounded-2xl p-6 text-center bg-slate-50/60 transition-colors">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="absolute inset-0 opacity-0 cursor-pointer z-10"
-              />
-              {imagePreview ? (
-                <div className="relative w-full h-48 rounded-xl overflow-hidden border border-slate-200">
-                  <Image src={imagePreview} alt="Preview Poster" fill className="object-cover" unoptimized />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setImagePreview(null);
-                      setPoster(null);
-                    }}
-                    className="absolute top-2 right-2 p-1.5 bg-white/90 text-slate-700 rounded-lg shadow z-20 hover:bg-white transition"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2 py-3">
-                  <Upload className="w-6 h-6 text-slate-400 mx-auto" />
-                  <p className="text-xs sm:text-sm font-semibold text-slate-700">
-                    Klik untuk upload poster
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Mendukung PNG, JPG, WEBP — maks 5MB
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 
