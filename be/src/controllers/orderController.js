@@ -119,6 +119,7 @@ const buatPesanan = async (req, res) => {
 
     return res.status(201).json({
       message: "Pesanan berhasil dibuat",
+      order_id: order ? order.id : null,
     });
   } catch (error) {
     console.error("Gagal membuat pesanan:", error.message);

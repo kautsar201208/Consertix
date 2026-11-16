@@ -29,6 +29,8 @@ const tambahEvent = async (req, res) => {
     syarat_ketentuan,
     tanggal,
     jam,
+    jam_selesai,
+    open_gate,
     lokasi,
     status,
     ticket_categories: ticketCategoriesPayload,
@@ -80,6 +82,10 @@ const tambahEvent = async (req, res) => {
       created_by: req.user.id,
     };
 
+    // Extra optional fields — stored only if columns exist
+    if (jam_selesai && jam_selesai.trim()) baseEventData.jam_selesai = jam_selesai.trim();
+    if (open_gate && open_gate.trim()) baseEventData.open_gate = open_gate.trim();
+
     let eventResult = await supabase
       .from("events")
       .insert(
@@ -98,6 +104,18 @@ const tambahEvent = async (req, res) => {
         .single();
     }
 
+    // Fallback: jika jam_selesai / open_gate belum ada di DB, coba tanpa keduanya
+    if (
+      isMissingColumnError(eventResult.error, "jam_selesai") ||
+      isMissingColumnError(eventResult.error, "open_gate")
+    ) {
+      const { jam_selesai: _js, open_gate: _og, ...safeData } = baseEventData;
+      eventResult = await supabase
+        .from("events")
+        .insert(safeData)
+        .select("id")
+        .single();
+    }
     if (eventResult.error) throw eventResult.error;
     const event = eventResult.data;
 
@@ -196,6 +214,8 @@ const updateEvent = async (req, res) => {
     syarat_ketentuan,
     tanggal,
     jam,
+    jam_selesai,
+    open_gate,
     lokasi,
     status,
     ticket_categories: ticketCategoriesPayload,
@@ -216,6 +236,8 @@ const updateEvent = async (req, res) => {
       lokasi,
       status,
     };
+    if (jam_selesai !== undefined) updates.jam_selesai = jam_selesai || null;
+    if (open_gate !== undefined) updates.open_gate = open_gate || null;
     if (req.file) updates.poster = req.file.filename;
 
     let eventResult = await supabase
@@ -233,6 +255,20 @@ const updateEvent = async (req, res) => {
       eventResult = await supabase
         .from("events")
         .update(updates)
+        .eq("id", req.params.id)
+        .select("id")
+        .maybeSingle();
+    }
+
+    // Fallback: jika jam_selesai / open_gate belum ada di DB
+    if (
+      isMissingColumnError(eventResult.error, "jam_selesai") ||
+      isMissingColumnError(eventResult.error, "open_gate")
+    ) {
+      const { jam_selesai: _js, open_gate: _og, ...safeUpdates } = updates;
+      eventResult = await supabase
+        .from("events")
+        .update(safeUpdates)
         .eq("id", req.params.id)
         .select("id")
         .maybeSingle();
