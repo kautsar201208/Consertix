@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   TextInput,
@@ -26,9 +26,16 @@ export default function LoginScreen() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const router = useRouter();
-  const { login, loading } = useAuth();
+  const { login, loading, isLoggedIn } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+
+  // Jika sudah login, langsung arahkan ke beranda (tidak perlu login ulang)
+  useEffect(() => {
+    if (isLoggedIn) {
+      router.replace('/(tabs)');
+    }
+  }, [isLoggedIn]);
 
   const handleLogin = async () => {
     setErrorMessage('');

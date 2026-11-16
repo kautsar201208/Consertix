@@ -92,7 +92,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       await Promise.all([
         storage.setItem(TOKEN_KEY, receivedToken),
+        storage.setItem('token', receivedToken),
         storage.setItem(USER_KEY, JSON.stringify(receivedUser)),
+        storage.setItem('user', JSON.stringify(receivedUser)),
       ]);
 
       setToken(receivedToken);
@@ -135,7 +137,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       await Promise.all([
         storage.setItem(TOKEN_KEY, receivedToken),
+        storage.setItem('token', receivedToken),
         storage.setItem(USER_KEY, JSON.stringify(receivedUser)),
+        storage.setItem('user', JSON.stringify(receivedUser)),
       ]);
 
       setToken(receivedToken);
@@ -155,7 +159,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       await Promise.all([
         storage.removeItem(TOKEN_KEY),
+        storage.removeItem('token'),
         storage.removeItem(USER_KEY),
+        storage.removeItem('user'),
       ]);
       setToken(null);
       setUser(null);
