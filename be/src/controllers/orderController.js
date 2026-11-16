@@ -2,10 +2,28 @@ const db = require("../config/db");
 
 // Buat Pesanan
 const buatPesanan = (req, res) => {
-  const { ticket_category_id, jumlah_tiket } = req.body;
+  const {
+    ticket_category_id,
+    jumlah_tiket,
+    first_name,
+    last_name,
+    email,
+    phone,
+    id_number,
+    date_birth,
+  } = req.body;
   const user_id = req.user.id;
 
-  if (!ticket_category_id || !jumlah_tiket) {
+  if (
+    !ticket_category_id ||
+    !jumlah_tiket ||
+    !first_name ||
+    !last_name ||
+    !email ||
+    !phone ||
+    !id_number ||
+    !date_birth
+  ) {
     return res.status(400).json({
       message: "Semua data harus diisi",
     });
@@ -39,13 +57,20 @@ const buatPesanan = (req, res) => {
 
       db.query(
         `INSERT INTO orders
-        (user_id, ticket_category_id, jumlah_tiket, total_harga)
-        VALUES (?, ?, ?, ?)`,
+        (user_id, ticket_category_id, jumlah_tiket, total_harga,
+         first_name, last_name, email, phone, id_number, date_birth)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           user_id,
           ticket_category_id,
           jumlah_tiket,
           total_harga,
+          first_name,
+          last_name,
+          email,
+          phone,
+          id_number,
+          date_birth,
         ],
         (err) => {
           if (err) {

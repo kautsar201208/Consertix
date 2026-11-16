@@ -35,15 +35,37 @@ const register = async (req, res) => {
       db.query(
         "INSERT INTO users (nama, email, password, role) VALUES (?, ?, ?, ?)",
         [nama, email, passwordHash, "user"],
-        (err) => {
+        (err, result) => {
           if (err) {
             return res.status(500).json({
               message: err.message,
             });
           }
 
+          const userId = result.insertId;
+          const normalizedRole = "user";
+          
+          const token = jwt.sign(
+            {
+              id: userId,
+              nama: nama,
+              role: normalizedRole,
+            },
+            process.env.JWT_SECRET,
+            {
+              expiresIn: "1d",
+            }
+          );
+
           res.status(201).json({
             message: "Register berhasil",
+            token,
+            user: {
+              id: userId,
+              nama: nama,
+              email: email,
+              role: normalizedRole,
+            },
           });
         }
       );
