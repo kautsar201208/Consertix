@@ -351,7 +351,15 @@ export default function CheckoutSuccessScreen() {
           {/* QR Code & Code Section */}
           <View style={styles.qrSection}>
             <View style={styles.qrCard}>
-              <Ionicons name="qr-code" size={160} color="#131B2E" />
+              <Image
+                source={{
+                  uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+                    `CONCERTIX TICKET VERIFIED\nKode Tiket: ${activeTicket.code}\nEvent: ${params.eventTitle || 'Konser Musik'}\nKategori: ${activeTicket.category}\nPemegang: ${activeTicket.holderName}\nNIK: ${activeTicket.idNum}\nStatus: BERHASIL VALID`
+                  )}&color=131b2e&bgcolor=ffffff&margin=1`,
+                }}
+                style={styles.qrImage}
+                resizeMode="contain"
+              />
               <View style={styles.qrCenterLogo}>
                 <Ionicons name="checkmark" size={14} color="#FFFFFF" />
               </View>
@@ -1024,8 +1032,8 @@ const styles = StyleSheet.create({
   qrCard: {
     position: 'relative',
     backgroundColor: '#FFFFFF',
-    padding: 8,
-    borderRadius: 14,
+    padding: 12,
+    borderRadius: 16,
     shadowColor: '#131B2E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -1036,6 +1044,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  qrImage: {
+    width: 170,
+    height: 170,
   },
   qrCenterLogo: {
     position: 'absolute',

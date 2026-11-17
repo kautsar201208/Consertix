@@ -1,6 +1,14 @@
 
 const supabase = require("../config/supabase");
 
+const isMissingColumnError = (err, column) =>
+  Boolean(
+    err &&
+      (err.code === "PGRST204" ||
+        err.code === "42703" ||
+        (typeof err.message === "string" && err.message.includes(column)))
+  );
+
 // Membuat pesanan
 const buatPesanan = async (req, res) => {
   const {
@@ -25,8 +33,7 @@ const buatPesanan = async (req, res) => {
     !last_name ||
     !email ||
     !phone ||
-    !id_number ||
-    !date_birth
+    !id_number
   ) {
     return res.status(400).json({
       message: "Semua data harus diisi",
@@ -64,25 +71,62 @@ const buatPesanan = async (req, res) => {
 
     const total_harga = ticket.harga * quantity;
 
-    // Simpan pesanan ke Supabase
-    const { data: order, error: orderError } = await supabase
+    // Siapkan data pesanan dasar
+    const baseOrder = {
+      user_id,
+      ticket_category_id,
+      jumlah_tiket: quantity,
+      total_harga,
+      first_name,
+      last_name,
+      email,
+      phone,
+      id_number,
+    };
+
+    let orderData = date_birth
+      ? { ...baseOrder, date_birth }
+      : baseOrder;
+
+    // Simpan pesanan ke Supabase dengan fallback jika kolom belum ada di tabel orders
+    let orderResult = await supabase
       .from("orders")
-      .insert({
+      .insert(orderData)
+      .select("id")
+      .single();
+
+    if (isMissingColumnError(orderResult.error, "date_birth")) {
+      delete orderData.date_birth;
+      orderResult = await supabase
+        .from("orders")
+        .insert(orderData)
+        .select("id")
+        .single();
+    }
+
+    // Jika kolom first_name / last_name / email / phone / id_number juga belum ada di tabel Supabase
+    if (
+      isMissingColumnError(orderResult.error, "first_name") ||
+      isMissingColumnError(orderResult.error, "last_name") ||
+      isMissingColumnError(orderResult.error, "phone") ||
+      isMissingColumnError(orderResult.error, "id_number") ||
+      isMissingColumnError(orderResult.error, "email")
+    ) {
+      const fallbackOrder = {
         user_id,
         ticket_category_id,
         jumlah_tiket: quantity,
         total_harga,
-        first_name,
-        last_name,
-        email,
-        phone,
-        id_number,
-        date_birth,
-      })
-      .select("id")
-      .single();
+      };
+      orderResult = await supabase
+        .from("orders")
+        .insert(fallbackOrder)
+        .select("id")
+        .single();
+    }
 
-    if (orderError) throw orderError;
+    if (orderResult.error) throw orderResult.error;
+    const order = orderResult.data;
 
     // Kurangi stok dengan pengecekan stok sebelumnya
     const { data: updatedTicket, error: stockError } = await supabase
