@@ -159,27 +159,10 @@ export default function PaymentScreen() {
       });
     } catch (err: any) {
       console.error('Payment Error:', err);
-      // Fallback simulasi jika backend offline/koneksi demo terputus
-      const orderId = String(Math.floor(100000 + Math.random() * 900000));
-      router.replace({
-        pathname: '/checkout/success' as any,
-        params: {
-          orderId,
-          eventTitle: params.eventTitle,
-          eventDate: params.eventDate,
-          eventLocation: params.eventLocation,
-          poster: params.poster,
-          ticketName: params.ticketName,
-          ticketPrice: params.ticketPrice,
-          quantity: String(ticketCount),
-          namaLengkap: params.namaLengkap,
-          email: params.email,
-          phone: params.phone,
-          idNumber: params.idNumber,
-          paymentMethod,
-          totalAmount: String(totalBill),
-        },
-      });
+      Alert.alert(
+        'Gagal Memproses Pesanan',
+        err.message || 'Terjadi kesalahan saat membuat pesanan. Pastikan backend aktif.'
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -188,7 +171,11 @@ export default function PaymentScreen() {
   const getPosterUri = (poster: string | null | undefined) => {
     if (!poster) return null;
     if (poster.startsWith('http')) return poster;
-    return `${API_URL}/uploads/${poster}`;
+    const cleanPoster = poster.startsWith('/') ? poster.slice(1) : poster;
+    if (cleanPoster.startsWith('uploads/')) {
+      return `${API_URL}/${cleanPoster}`;
+    }
+    return `${API_URL}/uploads/posters/${cleanPoster}`;
   };
 
   const posterUri = getPosterUri(params.poster);

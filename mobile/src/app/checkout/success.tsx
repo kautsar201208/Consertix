@@ -51,7 +51,11 @@ export default function CheckoutSuccessScreen() {
   const getPosterUri = (poster: string | null | undefined) => {
     if (!poster) return null;
     if (poster.startsWith('http')) return poster;
-    return `${API_URL}/uploads/${poster}`;
+    const cleanPoster = poster.startsWith('/') ? poster.slice(1) : poster;
+    if (cleanPoster.startsWith('uploads/')) {
+      return `${API_URL}/${cleanPoster}`;
+    }
+    return `${API_URL}/uploads/posters/${cleanPoster}`;
   };
 
   const posterUri = getPosterUri(params.poster);

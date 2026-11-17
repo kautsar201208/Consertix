@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
  * - Untuk HP Fisik via Expo Go (Wi-Fi): http://10.10.64.142:5000
  * - Untuk Android Emulator (AVD): http://10.0.2.2:5000
  */
-export const LOCAL_DEV_IP = '10.10.64.142';
+export const LOCAL_DEV_IP = '10.10.64.175';
 export const PORT = '5000';
 
 export const getApiUrl = (): string => {
