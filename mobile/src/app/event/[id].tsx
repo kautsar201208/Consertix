@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,7 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '@/config/api';
 import { openGoogleMaps } from '@/utils/maps';
@@ -53,28 +53,35 @@ export default function EventDetailScreen() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [ticketCounts, setTicketCounts] = useState<Record<number, number>>({});
 
-  useEffect(() => {
+  const fetchDetail = useCallback(async (isSilent = false) => {
     if (!id) return;
-
-    async function fetchDetail() {
-      try {
-        setLoading(true);
-        const res = await fetch(`${API_URL}/api/events/${id}`);
-        if (!res.ok) {
-          throw new Error('Event tidak ditemukan');
-        }
-        const data = await res.json();
-        setEvent(data);
-      } catch (err) {
-        console.error('Error fetching event detail:', err);
-        Alert.alert('Gagal Memuat', 'Tidak dapat memuat detail event.');
-      } finally {
-        setLoading(false);
+    try {
+      if (!isSilent) setLoading(true);
+      const res = await fetch(`${API_URL}/api/events/${id}`);
+      if (!res.ok) {
+        throw new Error('Event tidak ditemukan');
       }
+      const data = await res.json();
+      setEvent(data);
+    } catch (err) {
+      console.error('Error fetching event detail:', err);
+      if (!isSilent) {
+        Alert.alert('Gagal Memuat', 'Tidak dapat memuat detail event.');
+      }
+    } finally {
+      if (!isSilent) setLoading(false);
     }
-
-    fetchDetail();
   }, [id]);
+
+  useEffect(() => {
+    fetchDetail();
+  }, [fetchDetail]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDetail(true);
+    }, [fetchDetail])
+  );
 
   const handleShare = async () => {
     if (!event) return;
@@ -103,7 +110,11 @@ export default function EventDetailScreen() {
   const getPosterUri = (poster: string | null) => {
     if (!poster) return null;
     if (poster.startsWith('http')) return poster;
-    return `${API_URL}/uploads/${poster}`;
+    const cleanPoster = poster.startsWith('/') ? poster.slice(1) : poster;
+    if (cleanPoster.startsWith('uploads/')) {
+      return `${API_URL}/${cleanPoster}`;
+    }
+    return `${API_URL}/uploads/posters/${cleanPoster}`;
   };
 
   const totalTicketsSelected = Object.values(ticketCounts).reduce((acc, curr) => acc + curr, 0);
@@ -574,14 +585,12 @@ export default function EventDetailScreen() {
       <View style={styles.bottomBar}>
         <View style={styles.bottomPriceCol}>
           <Text style={styles.bottomPriceLabel}>
-            {totalTicketsSelected > 0 ? 'Total Pembayaran' : 'Mulai dari'}
+            {totalTicketsSelected > 0 ? 'Total Pembayaran' : 'Total Harga'}
           </Text>
           <Text style={styles.bottomPriceValue}>
             {totalTicketsSelected > 0
               ? `Rp${calculateTotalPrice().toLocaleString('id-ID')}`
-              : minPrice
-              ? `Rp${minPrice.toLocaleString('id-ID')}`
-              : 'Harga Terjangkau'}
+              : 'Rp0'}
           </Text>
         </View>
         <TouchableOpacity style={styles.buyNowBtn} activeOpacity={0.9} onPress={handleBooking}>
@@ -983,7 +992,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   ticketCardSoldOut: {
-    opacity: 0.6,
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+    borderWidth: 1,
+    opacity: 0.65,
   },
   ticketTopRow: {
     flexDirection: 'row',

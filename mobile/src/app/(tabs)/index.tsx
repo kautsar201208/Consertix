@@ -13,7 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { API_URL } from '@/config/api';
@@ -78,6 +78,12 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvents();
+    }, [fetchEvents])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -148,7 +154,11 @@ export default function HomeScreen() {
   const getPosterUri = (poster: string | null) => {
     if (!poster) return null;
     if (poster.startsWith('http')) return poster;
-    return `${API_URL}/uploads/${poster}`;
+    const cleanPoster = poster.startsWith('/') ? poster.slice(1) : poster;
+    if (cleanPoster.startsWith('uploads/')) {
+      return `${API_URL}/${cleanPoster}`;
+    }
+    return `${API_URL}/uploads/posters/${cleanPoster}`;
   };
 
   const trendingEvents = filteredEvents.slice(0, 4);
