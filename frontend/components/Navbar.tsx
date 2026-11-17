@@ -1,374 +1,228 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Menu,
-  Bell,
   Search,
+  Bell,
+  Menu,
+  ChevronDown,
+  User,
   LogOut,
-  CheckCircle2,
-  AlertTriangle,
-  Info,
-  LayoutGrid,
-  Moon,
-  Sun
+  ShieldCheck,
+  ExternalLink,
 } from "lucide-react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
-
-type NotificationItem = {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  unread: boolean;
-  type: "sale" | "warning" | "system";
-  href: string;
-};
-
-type ApiEvent = {
-  id?: string | number;
-  judul?: string;
-  status?: string;
-  tanggal?: string;
-};
-
-type ApiPayment = {
-  id?: string | number;
-  order_id?: string | number;
-  nama?: string;
-  judul?: string;
-  status?: string;
-  created_at?: string;
-};
-
-type SearchResult = {
-  id: string | number;
-  title: string;
-  subtitle: string;
-  href: string;
-};
 
 interface NavbarProps {
   onMobileMenuToggle: () => void;
-  darkMode: boolean;
-  onThemeToggle: () => void;
 }
 
-export default function Navbar({ onMobileMenuToggle, darkMode, onThemeToggle }: NavbarProps) {
+export default function Navbar({ onMobileMenuToggle }: NavbarProps) {
   const router = useRouter();
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [adminUser, setAdminUser] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [user, setUser] = useState<{ nama?: string; email?: string } | null>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showNotifMenu, setShowNotifMenu] = useState(false);
+
+  const profileRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const savedUser = localStorage.getItem("user");
-      if (savedUser) {
-        try {
-          const parsedUser = JSON.parse(savedUser);
-          Promise.resolve().then(() => setUser(parsedUser));
-        } catch {
-          // ignore
-        }
-      }
-    }
-
-    async function loadNotifications() {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
       try {
-        const [eventsResponse, paymentsResponse] = await Promise.all([
-          fetch(`${API_URL}/api/events`),
-          token
-            ? fetch(`${API_URL}/api/payments`, { headers: { Authorization: `Bearer ${token}` } })
-            : Promise.resolve(null)
-        ]);
-        const events: ApiEvent[] = eventsResponse.ok ? await eventsResponse.json() : [];
-        const payments: ApiPayment[] = paymentsResponse?.ok ? await paymentsResponse.json() : [];
-        const readIds = new Set<string>(JSON.parse(localStorage.getItem("concertix_read_notifications") || "[]"));
-        const nextNotifications: NotificationItem[] = [];
-
-        payments.filter((payment) => ["pending", "menunggu"].includes((payment.status || "").toLowerCase()))
-          .slice(0, 5)
-          .forEach((payment) => nextNotifications.push({
-            id: `payment-${payment.id || payment.order_id}`,
-            title: "Pembayaran menunggu verifikasi",
-            message: `${payment.nama || "Pelanggan"} mengunggah bukti untuk ${payment.judul || "sebuah event"}.`,
-            time: payment.created_at?.slice(0, 10) || "Baru",
-            unread: !readIds.has(`payment-${payment.id || payment.order_id}`),
-            type: "warning",
-            href: "/Dashboard/Transaksi"
-          }));
-
-        payments.filter((payment) => ["failed", "gagal", "rejected"].includes((payment.status || "").toLowerCase()))
-          .slice(0, 5)
-          .forEach((payment) => nextNotifications.push({
-            id: `failed-payment-${payment.id || payment.order_id}`,
-            title: "Pembayaran ditolak",
-            message: `Transaksi #${payment.id || payment.order_id} perlu diperiksa.`,
-            time: payment.created_at?.slice(0, 10) || "Baru",
-            unread: !readIds.has(`failed-payment-${payment.id || payment.order_id}`),
-            type: "warning",
-            href: "/Dashboard/Transaksi"
-          }));
-
-        events.filter((event) => !["aktif", "active"].includes((event.status || "").toLowerCase()))
-          .slice(0, 5)
-          .forEach((event) => nextNotifications.push({
-            id: `event-${event.id}`,
-            title: "Event perlu perhatian",
-            message: `${event.judul || "Event"} berstatus ${event.status || "belum aktif"}.`,
-            time: event.tanggal || "Baru",
-            unread: !readIds.has(`event-${event.id}`),
-            type: "system",
-            href: "/Dashboard/DaftarEvent"
-          }));
-
-        setNotifications(nextNotifications);
-        const normalizedQuery = searchQuery.trim().toLowerCase();
-        if (normalizedQuery) {
-          setSearchResults([
-            ...events
-              .filter((event) => `${event.judul || ""} ${event.status || ""}`.toLowerCase().includes(normalizedQuery))
-              .slice(0, 5)
-              .map((event) => ({
-                id: event.id || event.judul || "event",
-                title: event.judul || "Event",
-                subtitle: `Event${event.status ? ` · ${event.status}` : ""}`,
-                href: "/Dashboard/DaftarEvent"
-              })),
-            ...payments
-              .filter((payment) => `${payment.id || payment.order_id || ""} ${payment.nama || ""} ${payment.judul || ""}`.toLowerCase().includes(normalizedQuery))
-              .slice(0, 5)
-              .map((payment) => ({
-                id: payment.id || payment.order_id || "payment",
-                title: `Transaksi #${payment.id || payment.order_id}`,
-                subtitle: `${payment.nama || "Pelanggan"} · ${payment.judul || "Event"}`,
-                href: "/Dashboard/Transaksi"
-              }))
-          ]);
-        }
-      } catch {
-        setNotifications([]);
-      }
+        const u = localStorage.getItem("user");
+        if (u) setAdminUser(JSON.parse(u));
+      } catch {}
     }
 
-    void loadNotifications();
-  }, [searchQuery]);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifMenu(false);
+      }
+    };
 
-  const unreadCount = notifications.filter((n) => n.unread).length;
-
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
-    localStorage.setItem("concertix_read_notifications", JSON.stringify(notifications.map((n) => n.id)));
-  };
-
-  const openNotification = (notification: NotificationItem) => {
-    const readIds = JSON.parse(localStorage.getItem("concertix_read_notifications") || "[]");
-    localStorage.setItem("concertix_read_notifications", JSON.stringify([...new Set([...readIds, notification.id])]));
-    setNotifications((prev) => prev.map((n) => n.id === notification.id ? { ...n, unread: false } : n));
-    setShowNotifications(false);
-    router.push(notification.href);
-  };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLogout = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
     }
-    setShowProfileMenu(false);
-    router.push("/Login");
+    router.replace("/Login");
   };
 
-  const userName = user?.nama || "Alex Rivera";
-  const userEmail = user?.email || "alex.rivera@concertix.io";
-  const userInitials = userName
-    ? userName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .substring(0, 2)
-        .toUpperCase()
-    : "AR";
+  const adminName = adminUser?.nama || "Dimas Arya";
+  const adminRole = adminUser?.role || "Super Admin";
+  const adminInitials = adminName.slice(0, 2).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-[#111844] text-white border-b border-[#0a0f2b] shadow-md">
-      {/* Left section: Mobile Toggle & Page Title Breadcrumb */}
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-40 w-full h-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 flex items-center justify-between transition-all">
+      {/* SISI KIRI: HAMBURGER MOBILE & SEARCH BAR */}
+      <div className="flex items-center gap-3 sm:gap-4 flex-1 max-w-xl">
+        {/* Tombol Hamburger (Mobile only) */}
         <button
           onClick={onMobileMenuToggle}
-          className="lg:hidden p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition"
-          aria-label="Open Mobile Menu"
+          className="w-10 h-10 rounded-xl bg-[#111844] text-white flex items-center justify-center lg:hidden shrink-0 shadow-sm"
+          aria-label="Buka Menu Navigasi"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2.5">
-          <LayoutGrid className="w-5 h-5 text-indigo-200" />
-          <h1 className="text-base sm:text-lg font-bold text-white tracking-tight">Dashboard</h1>
-        </div>
-      </div>
-
-      {/* Right Section: Pill Search Bar & Profile */}
-      <div className="flex items-center gap-4">
-        {/* Search Bar */}
-        <div className="relative flex items-center">
-          <Search className="absolute left-3.5 w-4 h-4 text-indigo-200" />
+        {/* Search Bar Membulat Sejajar */}
+        <div className="relative w-full max-w-md">
+          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <Search className="w-4 h-4" />
+          </span>
           <input
             type="text"
             value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Cari event, transaksi, venue..."
-            className="w-60 sm:w-80 pl-10 pr-4 py-2 text-xs sm:text-sm bg-white/15 text-white placeholder-indigo-200 rounded-full border border-white/20 focus:outline-none focus:bg-white focus:text-slate-900 focus:placeholder-slate-400 transition-all"
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari event, transaksi, tiket..."
+            className="w-full bg-slate-50 text-slate-800 text-xs sm:text-sm pl-10 pr-4 py-2.5 rounded-full border border-slate-200/90 focus:outline-none focus:bg-white focus:border-[#111844] focus:ring-2 focus:ring-[#111844]/10 transition-all placeholder:text-slate-400"
           />
-          {searchQuery.trim() && (
-            <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-xl bg-white text-slate-900 border border-slate-200 shadow-xl z-50 overflow-hidden">
-              {searchResults.length > 0 ? searchResults.map((result) => (
-                <button
-                  key={`${result.href}-${result.id}`}
-                  onClick={() => {
-                    setSearchQuery("");
-                    router.push(result.href);
-                  }}
-                  className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0"
-                >
-                  <p className="text-sm font-semibold truncate">{result.title}</p>
-                  <p className="text-xs text-slate-500 truncate mt-0.5">{result.subtitle}</p>
-                </button>
-              )) : (
-                <p className="px-4 py-5 text-xs text-slate-500">Tidak ada hasil ditemukan.</p>
-              )}
-            </div>
-          )}
         </div>
+      </div>
 
-        <button
-          onClick={onThemeToggle}
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/15 transition"
-          aria-label={darkMode ? "Aktifkan light mode" : "Aktifkan dark mode"}
-          title={darkMode ? "Light mode" : "Dark mode"}
-        >
-          {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-        </button>
-
-        {/* Notifications Popover */}
-        <div className="relative">
+      {/* SISI KANAN: TOMBOL NOTIFIKASI & LOGO PROFIL ADMIN */}
+      <div className="flex items-center gap-2.5 sm:gap-4">
+        {/* Tombol Notifikasi */}
+        <div className="relative" ref={notifRef}>
           <button
-            onClick={() => {
-              setShowNotifications(!showNotifications);
-              setShowProfileMenu(false);
-            }}
-            className="relative p-2 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/15 transition"
-            aria-label="Notifications"
+            onClick={() => setShowNotifMenu(!showNotifMenu)}
+            className="relative w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-[#111844] border border-slate-200 flex items-center justify-center transition-colors"
+            title="Notifikasi"
+            aria-label="Notifikasi"
           >
-            <Bell className="w-5 h-5" />
-            {unreadCount > 0 && (
-              <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-rose-400 ring-2 ring-[#111844]" />
-            )}
+            <Bell className="w-4 h-4" />
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-white" />
           </button>
 
+          {/* Dropdown Notifikasi */}
           <AnimatePresence>
-            {showNotifications && (
+            {showNotifMenu && (
               <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white text-slate-900 border border-slate-200 shadow-xl z-50 overflow-hidden"
+                className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-4 z-50 text-xs sm:text-sm"
               >
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm text-slate-900">Notifikasi</h3>
-                    {unreadCount > 0 && (
-                      <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-[#111844] text-white">
-                        {unreadCount} baru
-                      </span>
-                    )}
-                  </div>
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={markAllRead}
-                      className="text-xs text-[#111844] hover:underline font-semibold transition"
-                    >
-                      Tandai dibaca
-                    </button>
-                  )}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                  <p className="font-bold text-slate-900">Notifikasi</p>
+                  <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                    Live
+                  </span>
                 </div>
-
-                <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-slate-500">Tidak ada pemberitahuan baru.</div>
-                  ) : notifications.map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => openNotification(n)}
-                      className={`p-3.5 flex gap-3 text-xs transition ${
-                        n.unread ? "bg-indigo-50/50" : "hover:bg-slate-50"
-                      } w-full text-left`}
-                    >
-                      <div className="mt-0.5 shrink-0">
-                        {n.type === "sale" && (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                        )}
-                        {n.type === "warning" && (
-                          <AlertTriangle className="w-4 h-4 text-amber-500" />
-                        )}
-                        {n.type === "system" && <Info className="w-4 h-4 text-[#111844]" />}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between font-semibold text-slate-800 text-xs">
-                          <span>{n.title}</span>
-                          <span className="text-[10px] text-slate-400 font-normal">{n.time}</span>
-                        </div>
-                        <p className="text-slate-500 text-xs mt-0.5">{n.message}</p>
-                      </div>
-                    </button>
-                  ))}
+                <div className="space-y-2.5">
+                  <Link
+                    href="/Dashboard/Transaksi"
+                    onClick={() => setShowNotifMenu(false)}
+                    className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                      ✓
+                    </div>
+                    <div>
+                      <p className="font-bold text-xs text-slate-800">Pembayaran Baru Masuk</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Transaksi tiket berhasil dikonfirmasi</p>
+                    </div>
+                  </Link>
+                  <Link
+                    href="/Dashboard/DaftarEvent"
+                    onClick={() => setShowNotifMenu(false)}
+                    className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                      🎪
+                    </div>
+                    <div>
+                      <p className="font-bold text-xs text-slate-800">Event Tayang Aktif</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Tiket siap dipesan audiens publik</p>
+                    </div>
+                  </Link>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* Profile Menu Dropdown */}
-        <div className="relative">
+        {/* Tombol & Logo Profil Admin */}
+        <div className="relative" ref={profileRef}>
           <button
-            onClick={() => {
-              setShowProfileMenu(!showProfileMenu);
-              setShowNotifications(false);
-            }}
-            className="flex items-center gap-2 p-1 rounded-full border border-white/20 hover:border-white/40 transition"
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="flex items-center gap-2.5 sm:gap-3 bg-white pl-2 sm:pl-2.5 pr-2 sm:pr-3 py-1.5 rounded-full border border-slate-200/90 shadow-xs hover:border-slate-300 transition-colors"
+            aria-label="Menu Profil Admin"
           >
-            <div className="w-8 h-8 rounded-full bg-white text-[#111844] font-bold text-xs flex items-center justify-center shadow-xs">
-              {userInitials}
+            {/* Logo/Avatar Bulat Profil */}
+            <div className="w-9 h-9 rounded-full bg-[#111844] text-white font-bold flex items-center justify-center text-xs shadow-xs ring-2 ring-slate-100 shrink-0">
+              {adminInitials}
             </div>
+
+            {/* Nama & Role Admin */}
+            <div className="hidden sm:block text-left">
+              <p className="text-xs font-bold text-[#111844] leading-tight truncate max-w-[120px]">
+                {adminName}
+              </p>
+              <p className="text-[10px] text-slate-400 font-semibold capitalize tracking-wide">
+                {adminRole}
+              </p>
+            </div>
+
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
           </button>
 
+          {/* Dropdown Menu Profil Admin */}
           <AnimatePresence>
             {showProfileMenu && (
               <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 mt-2 w-56 rounded-2xl bg-white text-slate-900 border border-slate-200 shadow-xl z-50 py-2 text-xs"
+                className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-50 text-xs sm:text-sm"
               >
-                <div className="px-4 py-2.5 border-b border-slate-100">
-                  <p className="font-bold text-slate-900 text-sm">{userName}</p>
-                  <p className="text-slate-400 text-xs truncate mt-0.5">{userEmail}</p>
+                {/* Header Profil Dropdown */}
+                <div className="px-3 py-2.5 border-b border-slate-100 mb-1">
+                  <p className="font-bold text-slate-900 leading-tight">{adminName}</p>
+                  <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                    <ShieldCheck className="w-3 h-3 text-blue-600" /> {adminRole}
+                  </span>
                 </div>
 
-                <div className="py-1">
+                {/* Menu Navigasi Profil */}
+                <Link
+                  href="/Dashboard/ManagementUser"
+                  onClick={() => setShowProfileMenu(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-600 hover:text-[#111844] hover:bg-slate-50 transition"
+                >
+                  <User className="w-4 h-4 text-slate-400" />
+                  <span>Manajemen Akun</span>
+                </Link>
+
+                <Link
+                  href="/"
+                  target="_blank"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-600 hover:text-[#111844] hover:bg-slate-50 transition"
+                >
+                  <ExternalLink className="w-4 h-4 text-slate-400" />
+                  <span>Lihat Portal Publik</span>
+                </Link>
+
+                {/* Tombol Logout */}
+                <div className="pt-1 mt-1 border-t border-slate-100">
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-rose-600 hover:bg-rose-50 font-semibold flex items-center gap-2 transition"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 transition"
                   >
-                    <LogOut className="w-4 h-4" /> Sign Out
+                    <LogOut className="w-4 h-4" />
+                    <span className="font-semibold">Keluar Akun</span>
                   </button>
                 </div>
               </motion.div>

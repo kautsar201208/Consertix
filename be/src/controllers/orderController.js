@@ -295,8 +295,192 @@ const detailPesanan = async (req, res) => {
   }
 };
 
+// Mengambil ringkasan penjualan tiket dikelompokkan per event untuk dashboard admin
+const getEventsSummaryAdmin = async (_req, res) => {
+  try {
+    // 1. Ambil semua event
+    const { data: events, error: eventsError } = await supabase
+      .from("events")
+      .select("id, judul, deskripsi, tanggal, jam, lokasi, poster, status, created_at")
+      .order("created_at", { ascending: false });
+
+    if (eventsError) throw eventsError;
+    if (!events || events.length === 0) {
+      return res.json([]);
+    }
+
+    // 2. Ambil semua kategori tiket
+    const eventIds = events.map((e) => e.id);
+    const { data: categories, error: catError } = await supabase
+      .from("ticket_categories")
+      .select("id, event_id, nama_kategori, harga, stok")
+      .in("event_id", eventIds);
+
+    if (catError) throw catError;
+
+    const categoryIds = (categories || []).map((c) => c.id);
+
+    // 3. Ambil semua order yang berkaitan
+    let orders = [];
+    if (categoryIds.length > 0) {
+      const { data: orderData, error: ordersError } = await supabase
+        .from("orders")
+        .select("id, ticket_category_id, jumlah_tiket, total_harga, first_name, last_name, email, phone, id_number, date_birth, created_at")
+        .in("ticket_category_id", categoryIds)
+        .order("created_at", { ascending: false });
+
+      if (ordersError) throw ordersError;
+      orders = orderData || [];
+    }
+
+    // Buat map categoryId -> eventId & category
+    const catToEventMap = new Map();
+    (categories || []).forEach((c) => {
+      catToEventMap.set(String(c.id), c.event_id);
+    });
+
+    // Inisialisasi summary map
+    const summaryMap = new Map();
+    events.forEach((ev) => {
+      summaryMap.set(String(ev.id), {
+        ...ev,
+        total_orders: 0,
+        total_tickets_sold: 0,
+        total_revenue: 0,
+        buyers_count: 0,
+        categories: (categories || []).filter((c) => String(c.event_id) === String(ev.id)),
+      });
+    });
+
+    const uniqueBuyersPerEvent = new Map();
+
+    orders.forEach((ord) => {
+      const eventId = catToEventMap.get(String(ord.ticket_category_id));
+      if (eventId && summaryMap.has(String(eventId))) {
+        const item = summaryMap.get(String(eventId));
+        item.total_orders += 1;
+        item.total_tickets_sold += Number(ord.jumlah_tiket || 0);
+        item.total_revenue += Number(ord.total_harga || 0);
+
+        if (!uniqueBuyersPerEvent.has(String(eventId))) {
+          uniqueBuyersPerEvent.set(String(eventId), new Set());
+        }
+        const buyerIdentifier = ord.email || ord.phone || `${ord.first_name} ${ord.last_name}`;
+        uniqueBuyersPerEvent.get(String(eventId)).add(buyerIdentifier);
+      }
+    });
+
+    summaryMap.forEach((item, id) => {
+      item.buyers_count = uniqueBuyersPerEvent.has(id)
+        ? uniqueBuyersPerEvent.get(id).size
+        : item.total_orders;
+    });
+
+    return res.json(Array.from(summaryMap.values()));
+  } catch (error) {
+    console.error("Gagal mengambil ringkasan event:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// Mengambil seluruh riwayat order / pembeli tiket (bisa difilter via ?event_id=xxx)
+const getAllOrdersAdmin = async (req, res) => {
+  try {
+    const { event_id } = req.query;
+
+    let targetCategoryIds = null;
+    let targetEvent = null;
+
+    if (event_id) {
+      const { data: eventData } = await supabase
+        .from("events")
+        .select("id, judul, lokasi, tanggal, poster")
+        .eq("id", event_id)
+        .maybeSingle();
+
+      targetEvent = eventData;
+
+      const { data: catData, error: catErr } = await supabase
+        .from("ticket_categories")
+        .select("id, event_id, nama_kategori, harga")
+        .eq("event_id", event_id);
+
+      if (catErr) throw catErr;
+      targetCategoryIds = (catData || []).map((c) => c.id);
+
+      if (targetCategoryIds.length === 0) {
+        return res.json([]);
+      }
+    }
+
+    let query = supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (targetCategoryIds) {
+      query = query.in("ticket_category_id", targetCategoryIds);
+    }
+
+    const { data: orders, error: ordersError } = await query;
+    if (ordersError) throw ordersError;
+    if (!orders || orders.length === 0) return res.json([]);
+
+    // Ambil detail kategori dan event untuk setiap order
+    const categoryIds = [...new Set(orders.map((o) => o.ticket_category_id))];
+    const { data: categories } = await supabase
+      .from("ticket_categories")
+      .select("id, event_id, nama_kategori, harga")
+      .in("id", categoryIds);
+
+    const eventIds = [...new Set((categories || []).map((c) => c.event_id))];
+    const { data: events } = eventIds.length
+      ? await supabase.from("events").select("id, judul, lokasi, tanggal, poster").in("id", eventIds)
+      : { data: [] };
+
+    // Ambil bukti pembayaran dari tabel payments jika ada
+    const orderIds = orders.map((o) => o.id);
+    const { data: payments } = orderIds.length
+      ? await supabase.from("payments").select("id, order_id, bukti_pembayaran, status, created_at").in("order_id", orderIds)
+      : { data: [] };
+
+    const catMap = new Map((categories || []).map((c) => [String(c.id), c]));
+    const eventMap = new Map((events || []).map((e) => [String(e.id), e]));
+    const paymentMap = new Map((payments || []).map((p) => [String(p.order_id), p]));
+
+    const result = orders.map((ord) => {
+      const cat = catMap.get(String(ord.ticket_category_id));
+      const ev = cat ? eventMap.get(String(cat.event_id)) : (targetEvent || null);
+      const pay = paymentMap.get(String(ord.id));
+
+      const buyerName = `${ord.first_name || ""} ${ord.last_name || ""}`.trim() || ord.email || "Pembeli";
+
+      return {
+        ...ord,
+        nama: buyerName,
+        nama_kategori: cat?.nama_kategori ?? "Reguler",
+        harga_tiket: cat?.harga ?? 0,
+        event_id: ev?.id ?? null,
+        judul: ev?.judul ?? "Event Konser",
+        event_lokasi: ev?.lokasi ?? "",
+        event_tanggal: ev?.tanggal ?? "",
+        event_poster: ev?.poster ?? null,
+        bukti_pembayaran: pay?.bukti_pembayaran ?? null,
+        status: pay?.status || ord.status || "Paid",
+      };
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Gagal mengambil seluruh transaksi:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   buatPesanan,
   riwayatPesanan,
   detailPesanan,
+  getEventsSummaryAdmin,
+  getAllOrdersAdmin,
 };
