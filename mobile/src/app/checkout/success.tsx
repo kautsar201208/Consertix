@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -37,6 +37,8 @@ export default function CheckoutSuccessScreen() {
   const ticketCount = Math.max(1, parseInt(params.quantity || '1', 10));
   const [selectedTicketIndex, setSelectedTicketIndex] = useState(0);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+  const [checkedInTickets, setCheckedInTickets] = useState<Record<string, any>>({});
+  const [justCheckedInCode, setJustCheckedInCode] = useState<string | null>(null);
 
   const orderId = params.orderId || `${Math.floor(100000 + Math.random() * 900000)}`;
   const orderTag = `#CTX-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${orderId.slice(-5)}`;
@@ -83,6 +85,41 @@ export default function CheckoutSuccessScreen() {
   });
 
   const activeTicket = tickets[selectedTicketIndex] || tickets[0];
+  const isTicketUsed = Boolean(checkedInTickets[activeTicket.code]);
+
+  // Polling status tiket dari backend setiap 2 detik
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkStatus = async () => {
+      try {
+        for (const t of tickets) {
+          if (checkedInTickets[t.code]) continue;
+          const res = await fetch(`${API_URL}/api/orders/ticket-status/${t.code}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.is_used && isMounted) {
+              setCheckedInTickets((prev) => ({
+                ...prev,
+                [t.code]: data.detail || true,
+              }));
+              setJustCheckedInCode(t.code);
+            }
+          }
+        }
+      } catch (e) {
+        // Silent error on network glitch
+      }
+    };
+
+    const interval = setInterval(checkStatus, 2000);
+    checkStatus();
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [tickets, checkedInTickets]);
 
   const handleDownloadPdf = () => {
     Alert.alert(
@@ -174,23 +211,45 @@ export default function CheckoutSuccessScreen() {
 
         {/* 3. Celebration Header & Success Badge */}
         <View style={styles.celebrationSection}>
-          <View style={styles.badgeWrapper}>
-            <View style={styles.mainSuccessBadge}>
-              <Ionicons name="checkmark-circle" size={40} color="#004AC6" />
+          {isTicketUsed ? (
+            <View style={styles.badgeWrapper}>
+              <View style={[styles.mainSuccessBadge, { backgroundColor: '#ECFDF5' }]}>
+                <Ionicons name="shield-checkmark" size={40} color="#059669" />
+              </View>
+              <View style={[styles.celebrationMiniBadge, { backgroundColor: '#10B981' }]}>
+                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+              </View>
             </View>
-            <View style={styles.celebrationMiniBadge}>
-              <Ionicons name="sparkles" size={14} color="#FFFFFF" />
+          ) : (
+            <View style={styles.badgeWrapper}>
+              <View style={styles.mainSuccessBadge}>
+                <Ionicons name="checkmark-circle" size={40} color="#004AC6" />
+              </View>
+              <View style={styles.celebrationMiniBadge}>
+                <Ionicons name="sparkles" size={14} color="#FFFFFF" />
+              </View>
             </View>
-          </View>
+          )}
 
-          <View style={styles.statusPill}>
-            <Text style={styles.statusPillText}>PEMBAYARAN BERHASIL!</Text>
-          </View>
+          {isTicketUsed ? (
+            <View style={[styles.statusPill, { backgroundColor: '#D1FAE5' }]}>
+              <Text style={[styles.statusPillText, { color: '#065F46' }]}>
+                CHECK-IN GATE BERHASIL!
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.statusPill}>
+              <Text style={styles.statusPillText}>PEMBAYARAN BERHASIL!</Text>
+            </View>
+          )}
 
-          <Text style={styles.celebrationTitle}>Tiketmu Sudah Siap!</Text>
+          <Text style={styles.celebrationTitle}>
+            {isTicketUsed ? 'Tiket Telah Terverifikasi!' : 'Tiketmu Sudah Siap!'}
+          </Text>
           <Text style={styles.celebrationDesc}>
-            E-tiket resmi dan bukti pembayaran otomatis dikirimkan ke{' '}
-            <Text style={styles.boldText}>{params.email || 'dimas.arya@email.com'}</Text> serta WhatsApp terdaftar.
+            {isTicketUsed
+              ? 'Selamat menikmati konser! Tiket ini telah diverifikasi oleh petugas gate.'
+              : `E-tiket resmi dan bukti pembayaran otomatis dikirimkan ke ${params.email || 'email'} serta WhatsApp terdaftar.`}
           </Text>
 
           {/* Micro Transaction Quick Pills */}
@@ -350,29 +409,49 @@ export default function CheckoutSuccessScreen() {
 
           {/* QR Code & Code Section */}
           <View style={styles.qrSection}>
-            <View style={styles.qrCard}>
-              <Image
-                source={{
-                  uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-                    `CONCERTIX TICKET VERIFIED\nKode Tiket: ${activeTicket.code}\nEvent: ${params.eventTitle || 'Konser Musik'}\nKategori: ${activeTicket.category}\nPemegang: ${activeTicket.holderName}\nNIK: ${activeTicket.idNum}\nStatus: BERHASIL VALID`
-                  )}&color=131b2e&bgcolor=ffffff&margin=1`,
-                }}
-                style={styles.qrImage}
-                resizeMode="contain"
-              />
-              <View style={styles.qrCenterLogo}>
-                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+            {isTicketUsed ? (
+              <View style={styles.usedBadgeContainer}>
+                <View style={styles.usedIconCircle}>
+                  <Ionicons name="checkmark-done-circle" size={54} color="#10B981" />
+                </View>
+                <Text style={styles.usedBadgeTitle}>TIKET SUDAH DIGUNAKAN</Text>
+                <Text style={styles.usedBadgeSub}>
+                  Tiket ini telah berhasil di-scan di gate masuk dan dinyatakan VALID.
+                </Text>
+                <View style={styles.usedDetailBox}>
+                  <Text style={styles.usedDetailText}>
+                    Status: <Text style={{ fontWeight: '800', color: '#047857' }}>CHECKED-IN</Text>
+                  </Text>
+                  <Text style={styles.usedDetailCode}>KODE: {activeTicket.code}</Text>
+                </View>
               </View>
-            </View>
+            ) : (
+              <>
+                <View style={styles.qrCard}>
+                  <Image
+                    source={{
+                      uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+                        `CONCERTIX TICKET VERIFIED\nKode Tiket: ${activeTicket.code}\nEvent: ${params.eventTitle || 'Konser Musik'}\nKategori: ${activeTicket.category}\nPemegang: ${activeTicket.holderName}\nNIK: ${activeTicket.idNum}\nStatus: BERHASIL VALID`
+                      )}&color=131b2e&bgcolor=ffffff&margin=1`,
+                    }}
+                    style={styles.qrImage}
+                    resizeMode="contain"
+                  />
+                  <View style={styles.qrCenterLogo}>
+                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                  </View>
+                </View>
 
-            <Text style={styles.qrCodeText}>KODE: {activeTicket.code}</Text>
+                <Text style={styles.qrCodeText}>KODE: {activeTicket.code}</Text>
 
-            <View style={styles.qrHintRow}>
-              <Ionicons name="phone-portrait-outline" size={13} color="#004AC6" />
-              <Text style={styles.qrHintText}>
-                Tunjukkan QR Code ini di scanner gate masuk
-              </Text>
-            </View>
+                <View style={styles.qrHintRow}>
+                  <Ionicons name="phone-portrait-outline" size={13} color="#004AC6" />
+                  <Text style={styles.qrHintText}>
+                    Tunjukkan QR Code ini di scanner gate masuk
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -1342,5 +1421,55 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  /* Used Badge Container */
+  usedBadgeContainer: {
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    width: '100%',
+  },
+  usedIconCircle: {
+    marginBottom: 8,
+  },
+  usedBadgeTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#065F46',
+    letterSpacing: 0.5,
+  },
+  usedBadgeSub: {
+    fontSize: 11,
+    color: '#047857',
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
+    paddingHorizontal: 12,
+  },
+  usedDetailBox: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+    alignItems: 'center',
+    gap: 2,
+  },
+  usedDetailText: {
+    fontSize: 11,
+    color: '#374151',
+  },
+  usedDetailCode: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#065F46',
+    fontFamily: 'monospace',
+    letterSpacing: 1,
   },
 });

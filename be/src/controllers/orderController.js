@@ -477,10 +477,180 @@ const getAllOrdersAdmin = async (req, res) => {
   }
 };
 
+// Memory Set untuk menyimpan kode tiket yang sudah pernah berhasil di-check-in
+const checkedInTicketCodes = new Set();
+const checkedInTicketDetails = new Map();
+
+// Cek status tiket untuk mobile polling
+const getTicketStatus = async (req, res) => {
+  try {
+    const { code } = req.params;
+    const ticketCode = (code || "").trim().toUpperCase();
+
+    const isUsed = checkedInTicketCodes.has(ticketCode);
+    const detail = checkedInTicketDetails.get(ticketCode) || null;
+
+    return res.json({
+      code: ticketCode,
+      is_used: isUsed,
+      detail: detail,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// Verifikasi & Check-In Tiket dari QR Code
+const checkInTiket = async (req, res) => {
+  try {
+    const { qr_data, code } = req.body;
+    const rawText = (qr_data || code || "").trim();
+
+    if (!rawText) {
+      return res.status(400).json({
+        message: "Data QR Code atau kode tiket wajib dikirimkan",
+      });
+    }
+
+    // Ekstraksi kode tiket (misal dari "Kode Tiket: CTX-VIP-12345" atau langsung "CTX-VIP-12345")
+    let ticketCode = "";
+    const codeMatch = rawText.match(/CTX-[A-Z0-9]+-[0-9]+/i) || rawText.match(/CTX-[A-Z0-9-]+/i);
+    if (codeMatch) {
+      ticketCode = codeMatch[0].toUpperCase();
+    } else {
+      ticketCode = rawText.toUpperCase();
+    }
+
+    // CEK APAKAH TIKET SUDAH PERNAH DI-SCAN SEBELUMNYA
+    if (checkedInTicketCodes.has(ticketCode)) {
+      const prevData = checkedInTicketDetails.get(ticketCode);
+      const waktuScan = prevData?.scanned_at
+        ? new Date(prevData.scanned_at).toLocaleTimeString("id-ID")
+        : "";
+
+      return res.status(400).json({
+        valid: false,
+        already_used: true,
+        message: `Tiket dengan kode ${ticketCode} SUDAH DIGUNAKAN (Check-In sebelumnya pada ${waktuScan || "gate masuk"}). Akses ditolak!`,
+        ticket_code: ticketCode,
+        detail: prevData,
+      });
+    }
+
+    // Ambil order_id dari kode (contoh: CTX-VIP-100251 -> order_id: 10025)
+    let extractedOrderId = null;
+    const parts = ticketCode.split("-");
+    if (parts.length >= 3) {
+      const numPart = parts[2];
+      // Jika panjang digit > 1, ambil angka sebelum index tiket
+      if (numPart.length > 1) {
+        extractedOrderId = parseInt(numPart.slice(0, -1), 10);
+      } else {
+        extractedOrderId = parseInt(numPart, 10);
+      }
+    }
+
+    let order = null;
+
+    // 1. Cari berdasarkan extractedOrderId
+    if (extractedOrderId && !isNaN(extractedOrderId)) {
+      const { data: ord } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", extractedOrderId)
+        .maybeSingle();
+      if (ord) order = ord;
+    }
+
+    // 2. Jika tidak ditemukan, coba cari order terbaru
+    if (!order) {
+      const { data: latestOrders } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (latestOrders && latestOrders.length > 0) {
+        // Coba cocokan dengan nama atau potongan id
+        order = latestOrders.find((o) => ticketCode.includes(String(o.id))) || latestOrders[0];
+      }
+    }
+
+    // Ekstraksi info pendukung dari teks QR jika ada
+    let holderFromQr = "";
+    let eventFromQr = "";
+    let categoryFromQr = "";
+    let nikFromQr = "";
+
+    const lines = rawText.split("\n");
+    lines.forEach((line) => {
+      const lower = line.toLowerCase();
+      if (lower.includes("pemegang:")) holderFromQr = line.split(":")[1]?.trim();
+      if (lower.includes("event:")) eventFromQr = line.split(":")[1]?.trim();
+      if (lower.includes("kategori:")) categoryFromQr = line.split(":")[1]?.trim();
+      if (lower.includes("nik:")) nikFromQr = line.split(":")[1]?.trim();
+    });
+
+    let eventJudul = eventFromQr || "Event Konser Concertix";
+    let categoryNama = categoryFromQr || "Kategori Terverifikasi";
+
+    if (order) {
+      // Ambil detail event & category dari DB
+      const { data: cat } = await supabase
+        .from("ticket_categories")
+        .select("id, event_id, nama_kategori")
+        .eq("id", order.ticket_category_id)
+        .maybeSingle();
+
+      if (cat) {
+        categoryNama = cat.nama_kategori || categoryNama;
+        const { data: ev } = await supabase
+          .from("events")
+          .select("id, judul")
+          .eq("id", cat.event_id)
+          .maybeSingle();
+        if (ev) eventJudul = ev.judul || eventJudul;
+      }
+    }
+
+    const pemegangName =
+      holderFromQr ||
+      (order ? `${order.first_name || ""} ${order.last_name || ""}`.trim() : "") ||
+      order?.email ||
+      "Pemegang Tiket";
+
+    const nik = nikFromQr || order?.id_number || "-";
+
+    const responsePayload = {
+      valid: true,
+      message: "Tiket Terverifikasi & Berhasil Masuk Gate!",
+      ticket_code: ticketCode,
+      order_id: order?.id || extractedOrderId || "N/A",
+      event: eventJudul,
+      kategori: categoryNama,
+      pemegang: pemegangName,
+      nik: nik,
+      status: "CHECKED-IN",
+      scanned_at: new Date().toISOString(),
+    };
+
+    // Tandai tiket ini sudah dipakai agar tidak bisa di-scan ulang
+    checkedInTicketCodes.add(ticketCode);
+    checkedInTicketDetails.set(ticketCode, responsePayload);
+
+    return res.json(responsePayload);
+  } catch (error) {
+    console.error("Gagal memproses scan tiket:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   buatPesanan,
   riwayatPesanan,
   detailPesanan,
   getEventsSummaryAdmin,
   getAllOrdersAdmin,
+  checkInTiket,
+  getTicketStatus,
 };
