@@ -500,10 +500,59 @@ const getTicketStatus = async (req, res) => {
   }
 };
 
+// Ambil Statistik Gate & Riwayat Check-In untuk Event tertentu
+const getGateStats = async (req, res) => {
+  try {
+    const { event_id } = req.query;
+    const checkedInList = Array.from(checkedInTicketDetails.values());
+    const eventCheckedIn = event_id
+      ? checkedInList.filter((item) => String(item.event_id) === String(event_id))
+      : checkedInList;
+
+    let totalCapacity = 1000;
+    let totalTicketsSold = 0;
+
+    if (event_id && !isNaN(Number(event_id))) {
+      const { data: cats } = await supabase
+        .from("ticket_categories")
+        .select("id, stok")
+        .eq("event_id", Number(event_id));
+
+      if (cats && cats.length > 0) {
+        const catIds = cats.map((c) => c.id);
+        const { data: orders } = await supabase
+          .from("orders")
+          .select("jumlah_tiket")
+          .in("ticket_category_id", catIds);
+
+        const sold = (orders || []).reduce((acc, o) => acc + (Number(o.jumlah_tiket) || 0), 0);
+        const stockLeft = cats.reduce((acc, c) => acc + (Number(c.stok) || 0), 0);
+        totalTicketsSold = sold;
+        totalCapacity = sold + stockLeft > 0 ? sold + stockLeft : 1000;
+      }
+    }
+
+    return res.json({
+      checked_in_count: eventCheckedIn.length,
+      history: eventCheckedIn.slice(0, 50),
+      total_tickets_sold: totalTicketsSold,
+      total_capacity: totalCapacity,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 // Verifikasi & Check-In Tiket dari QR Code
 const checkInTiket = async (req, res) => {
   try {
-    const { qr_data, code, event_id: expected_event_id, event_title: expected_event_title } = req.body;
+    const {
+      qr_data,
+      code,
+      event_id: expected_event_id,
+      event_title: expected_event_title,
+      prevent_duplicate = true,
+    } = req.body;
     const rawText = (qr_data || code || "").trim();
 
     if (!rawText) {
@@ -524,8 +573,8 @@ const checkInTiket = async (req, res) => {
       ticketCode = rawText.toUpperCase();
     }
 
-    // CEK APAKAH TIKET SUDAH PERNAH DI-SCAN SEBELUMNYA
-    if (checkedInTicketCodes.has(ticketCode)) {
+    // CEK APAKAH TIKET SUDAH PERNAH DI-SCAN SEBELUMNYA (hanya jika prevent_duplicate bernilai true)
+    if (prevent_duplicate !== false && checkedInTicketCodes.has(ticketCode)) {
       const prevData = checkedInTicketDetails.get(ticketCode);
       const waktuScan = prevData?.scanned_at
         ? new Date(prevData.scanned_at).toLocaleTimeString("id-ID")
@@ -744,4 +793,5 @@ module.exports = {
   checkInTiket,
   getTicketStatus,
   resetScannedTickets,
+  getGateStats,
 };

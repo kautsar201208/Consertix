@@ -10,6 +10,7 @@ const {
   checkInTiket,
   getTicketStatus,
   resetScannedTickets,
+  getGateStats,
 } = require("../controllers/orderController");
 
 const auth = require("../middleware/authMiddleware");
@@ -22,6 +23,7 @@ router.get("/admin/all", auth, admin, getAllOrdersAdmin);
 // Scan checkin di gate konser (terbuka agar staff gate tidak terblokir expired token)
 router.post("/scan-checkin", checkInTiket);
 router.post("/scan-reset", resetScannedTickets);
+router.get("/gate-stats", getGateStats);
 
 // Public / User ticket status check (polling oleh aplikasi mobile)
 router.get("/ticket-status/:code", getTicketStatus);
