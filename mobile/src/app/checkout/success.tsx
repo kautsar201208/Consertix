@@ -67,7 +67,8 @@ export default function CheckoutSuccessScreen() {
     const catName = params.ticketName || 'Festival - Presale 1';
     const catCode = (params.ticketName || 'FST').substring(0, 3).toUpperCase();
     const guestName = isFirst ? (params.namaLengkap || 'Dimas Arya Pratama') : `Pengunjung ${index + 1}`;
-    const code = `CTX-${catCode}-${orderId.slice(-4)}${index + 1}`;
+    const cleanOrderId = String(orderId).replace(/[^0-9]/g, '') || `${Math.floor(1000 + Math.random() * 9000)}`;
+    const code = `CTX-${catCode}-${cleanOrderId}-${index + 1}`;
     const gate = isFirst ? 'Gate Barat / Zone B' : 'Gate Timur / Zone B';
     const area = isFirst ? 'Free Standing (Zone B)' : 'Free Standing (Zone B)';
     const idNum = isFirst ? (params.idNumber || '3171025809980004') : `317102580998000${index + 4}`;

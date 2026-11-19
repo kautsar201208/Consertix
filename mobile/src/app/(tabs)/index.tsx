@@ -36,6 +36,48 @@ export interface EventItem {
   open_gate?: string;
 }
 
+const FALLBACK_EVENTS: EventItem[] = [
+  {
+    id: 1,
+    judul: 'Soundfest Jakarta 2026',
+    nama_artis: 'Sheila on 7, Tulus, Raisa',
+    deskripsi: 'Festival musik multi-genre terbesar tahun ini di Stadion Madya GBK!',
+    tanggal: '2026-03-20',
+    jam: '19:00 WIB',
+    lokasi: 'Stadion Madya GBK, Jakarta Pusat',
+    poster: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&auto=format&fit=crop&q=80',
+    status: 'aktif',
+    open_gate: '15:00 WIB',
+    jam_selesai: '23:30 WIB',
+  },
+  {
+    id: 2,
+    judul: 'Java Jazz Festival 2026',
+    nama_artis: "Maliq & D'Essentials, Kahitna",
+    deskripsi: 'Kembali hadir merayakan festival musik jazz paling megah se-Asia Tenggara!',
+    tanggal: '2026-03-14',
+    jam: '16:00 WIB',
+    lokasi: 'JIExpo Kemayoran, Jakarta Pusat',
+    poster: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80',
+    status: 'aktif',
+    open_gate: '14:00 WIB',
+    jam_selesai: '23:00 WIB',
+  },
+  {
+    id: 3,
+    judul: 'Sheila on 7 - Tunggu Aku di Jakarta',
+    nama_artis: 'Sheila on 7',
+    deskripsi: 'Tur konser solo megah nostalgia bersama Sheila Gank seluruh Indonesia.',
+    tanggal: '2026-04-05',
+    jam: '20:00 WIB',
+    lokasi: 'Beach City International Stadium, Ancol',
+    poster: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800&auto=format&fit=crop&q=80',
+    status: 'aktif',
+    open_gate: '17:00 WIB',
+    jam_selesai: '23:00 WIB',
+  },
+];
+
 const CATEGORIES = [
   { id: 'Semua', label: 'Semua', icon: 'grid-outline' },
   { id: 'Konser', label: 'Konser', icon: 'musical-notes-outline' },
@@ -57,23 +99,62 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [favorites, setFavorites] = useState<number[]>([]);
 
+  const applyFilter = useCallback((query: string, category: string, list: EventItem[]) => {
+    let result = Array.isArray(list) ? list : [];
+
+    if (query && query.trim()) {
+      const q = query.toLowerCase();
+      result = result.filter(
+        (e) =>
+          (e?.judul || '').toLowerCase().includes(q) ||
+          (e?.nama_artis || '').toLowerCase().includes(q) ||
+          (e?.lokasi || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (category && category !== 'Semua') {
+      result = result.filter(
+        (e) =>
+          (e?.judul || '').toLowerCase().includes(category.toLowerCase()) ||
+          (e?.deskripsi || '').toLowerCase().includes(category.toLowerCase())
+      );
+    }
+
+    setFilteredEvents(result);
+  }, []);
+
   const fetchEvents = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/events`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const res = await fetch(`${API_URL}/api/events`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
       if (!res.ok) {
-        throw new Error('Gagal memuat event');
+        throw new Error('Gagal memuat event dari backend');
       }
       const data = await res.json();
-      const list: EventItem[] = Array.isArray(data) ? data : data.data || [];
-      setEvents(list);
-      applyFilter(searchQuery, selectedCategory, list);
+      const list: EventItem[] = Array.isArray(data) && data.length > 0 ? data : (data.data || []);
+      
+      if (list.length > 0) {
+        setEvents(list);
+        applyFilter(searchQuery, selectedCategory, list);
+      } else {
+        setEvents(FALLBACK_EVENTS);
+        applyFilter(searchQuery, selectedCategory, FALLBACK_EVENTS);
+      }
     } catch (err) {
-      console.error('Error fetching events:', err);
+      console.warn('Backend tidak dapat dihubungi atau timeout, memuat data fallback event:', err);
+      setEvents(FALLBACK_EVENTS);
+      applyFilter(searchQuery, selectedCategory, FALLBACK_EVENTS);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, applyFilter]);
 
   useEffect(() => {
     fetchEvents();
@@ -88,30 +169,6 @@ export default function HomeScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchEvents();
-  };
-
-  const applyFilter = (query: string, category: string, list: EventItem[]) => {
-    let result = list;
-
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      result = result.filter(
-        (e) =>
-          e.judul.toLowerCase().includes(q) ||
-          e.nama_artis.toLowerCase().includes(q) ||
-          e.lokasi.toLowerCase().includes(q)
-      );
-    }
-
-    if (category !== 'Semua') {
-      result = result.filter(
-        (e) =>
-          e.judul.toLowerCase().includes(category.toLowerCase()) ||
-          e.deskripsi.toLowerCase().includes(category.toLowerCase())
-      );
-    }
-
-    setFilteredEvents(result);
   };
 
   const handleSearch = (text: string) => {

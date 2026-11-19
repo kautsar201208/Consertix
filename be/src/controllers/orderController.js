@@ -503,7 +503,7 @@ const getTicketStatus = async (req, res) => {
 // Verifikasi & Check-In Tiket dari QR Code
 const checkInTiket = async (req, res) => {
   try {
-    const { qr_data, code } = req.body;
+    const { qr_data, code, event_id: expected_event_id, event_title: expected_event_title } = req.body;
     const rawText = (qr_data || code || "").trim();
 
     if (!rawText) {
@@ -512,9 +512,12 @@ const checkInTiket = async (req, res) => {
       });
     }
 
-    // Ekstraksi kode tiket (misal dari "Kode Tiket: CTX-VIP-12345" atau langsung "CTX-VIP-12345")
+    // Ekstraksi kode tiket (misal dari "Kode Tiket: CTX-VIP-10025-1" atau langsung "CTX-VIP-10025-1")
     let ticketCode = "";
-    const codeMatch = rawText.match(/CTX-[A-Z0-9]+-[0-9]+/i) || rawText.match(/CTX-[A-Z0-9-]+/i);
+    const codeMatch =
+      rawText.match(/CTX-[A-Z0-9]+-[0-9]+-[0-9]+/i) ||
+      rawText.match(/CTX-[A-Z0-9]+-[0-9]+/i) ||
+      rawText.match(/CTX-[A-Z0-9-]+/i);
     if (codeMatch) {
       ticketCode = codeMatch[0].toUpperCase();
     } else {
@@ -537,12 +540,16 @@ const checkInTiket = async (req, res) => {
       });
     }
 
-    // Ambil order_id dari kode (contoh: CTX-VIP-100251 -> order_id: 10025)
+    // Ambil order_id dari kode (contoh: CTX-VIP-10025-1 atau CTX-VIP-100251)
     let extractedOrderId = null;
     const parts = ticketCode.split("-");
-    if (parts.length >= 3) {
+    if (parts.length >= 4) {
+      // Format: CTX-VIP-10025-1 -> parts[2] adalah order_id murni
+      const parsed = parseInt(parts[2], 10);
+      if (!isNaN(parsed) && parsed > 0) extractedOrderId = parsed;
+    } else if (parts.length >= 3) {
       const numPart = parts[2];
-      // Jika panjang digit > 1, ambil angka sebelum index tiket
+      // Jika panjang digit > 1, coba angka sebelum index tiket
       if (numPart.length > 1) {
         extractedOrderId = parseInt(numPart.slice(0, -1), 10);
       } else {
@@ -562,7 +569,7 @@ const checkInTiket = async (req, res) => {
       if (ord) order = ord;
     }
 
-    // 2. Jika tidak ditemukan, coba cari order terbaru
+    // 2. Jika tidak ditemukan lewat extractedOrderId, cari order yang kode tiketnya mengandung ID-nya
     if (!order) {
       const { data: latestOrders } = await supabase
         .from("orders")
@@ -571,8 +578,7 @@ const checkInTiket = async (req, res) => {
         .limit(20);
 
       if (latestOrders && latestOrders.length > 0) {
-        // Coba cocokan dengan nama atau potongan id
-        order = latestOrders.find((o) => ticketCode.includes(String(o.id))) || latestOrders[0];
+        order = latestOrders.find((o) => ticketCode.includes(String(o.id))) || null;
       }
     }
 
@@ -585,31 +591,44 @@ const checkInTiket = async (req, res) => {
     const lines = rawText.split("\n");
     lines.forEach((line) => {
       const lower = line.toLowerCase();
-      if (lower.includes("pemegang:")) holderFromQr = line.split(":")[1]?.trim();
-      if (lower.includes("event:")) eventFromQr = line.split(":")[1]?.trim();
-      if (lower.includes("kategori:")) categoryFromQr = line.split(":")[1]?.trim();
-      if (lower.includes("nik:")) nikFromQr = line.split(":")[1]?.trim();
+      if (lower.startsWith("pemegang:")) holderFromQr = line.split(":")[1]?.trim();
+      else if (lower.includes("pemegang:")) holderFromQr = line.substring(line.indexOf(":") + 1)?.trim();
+
+      if (lower.startsWith("event:")) eventFromQr = line.split(":")[1]?.trim();
+      else if (lower.includes("event:")) eventFromQr = line.substring(line.indexOf(":") + 1)?.trim();
+
+      if (lower.startsWith("kategori:")) categoryFromQr = line.split(":")[1]?.trim();
+      else if (lower.includes("kategori:")) categoryFromQr = line.substring(line.indexOf(":") + 1)?.trim();
+
+      if (lower.startsWith("nik:")) nikFromQr = line.split(":")[1]?.trim();
+      else if (lower.includes("nik:")) nikFromQr = line.substring(line.indexOf(":") + 1)?.trim();
     });
 
-    let eventJudul = eventFromQr || "Event Konser Concertix";
+    let eventJudul = eventFromQr || expected_event_title || "Event Konser Concertix";
     let categoryNama = categoryFromQr || "Kategori Terverifikasi";
+
+    // Variabel cat dan catEventId di scope luar agar bisa diakses di validasi event
+    let cat = null;
+    let catEventId = null;
 
     if (order) {
       // Ambil detail event & category dari DB
-      const { data: cat } = await supabase
+      const { data: catData } = await supabase
         .from("ticket_categories")
         .select("id, event_id, nama_kategori")
         .eq("id", order.ticket_category_id)
         .maybeSingle();
 
-      if (cat) {
-        categoryNama = cat.nama_kategori || categoryNama;
+      if (catData) {
+        cat = catData;
+        catEventId = catData.event_id;
+        categoryNama = catData.nama_kategori || categoryNama;
         const { data: ev } = await supabase
           .from("events")
           .select("id, judul")
-          .eq("id", cat.event_id)
+          .eq("id", catData.event_id)
           .maybeSingle();
-        if (ev) eventJudul = ev.judul || eventJudul;
+        if (ev && ev.judul) eventJudul = ev.judul;
       }
     }
 
@@ -620,6 +639,52 @@ const checkInTiket = async (req, res) => {
       "Pemegang Tiket";
 
     const nik = nikFromQr || order?.id_number || "-";
+
+    // Validasi event_id HANYA jika:
+    // 1. expected_event_id adalah angka riil (bukan fake string "ev-1")
+    // 2. data order dan category ditemukan di database
+    const expEventIdNum = Number(expected_event_id);
+    const isRealEventId = expected_event_id && !isNaN(expEventIdNum) && expEventIdNum > 0;
+
+    if (isRealEventId && cat && catEventId !== null) {
+      if (String(catEventId) !== String(expEventIdNum)) {
+        return res.status(400).json({
+          valid: false,
+          wrong_event: true,
+          message: `Tiket TIDAK VALID untuk event ini! Tiket ini terdaftar untuk acara "${eventJudul}".`,
+          ticket_code: ticketCode,
+          event: eventJudul,
+          kategori: categoryNama,
+          pemegang: pemegangName,
+        });
+      }
+    }
+
+    // Validasi judul event:
+    // Hanya tolak jika tiket secara eksplisit membawa nama event lain yang BERBEDA total dari expected_event_title
+    if (expected_event_title && eventFromQr) {
+      const cleanQrTitle = eventFromQr.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const cleanExpTitle = expected_event_title.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      // Jika judul QR dan expected_event_title berbeda jauh dan bukan default "konsermusik"
+      if (
+        cleanQrTitle.length >= 4 &&
+        cleanExpTitle.length >= 4 &&
+        !cleanQrTitle.includes("konser") &&
+        !cleanQrTitle.includes(cleanExpTitle) &&
+        !cleanExpTitle.includes(cleanQrTitle)
+      ) {
+        return res.status(400).json({
+          valid: false,
+          wrong_event: true,
+          message: `Tiket TIDAK VALID untuk event ini! Tiket ini terdaftar untuk acara "${eventFromQr}".`,
+          ticket_code: ticketCode,
+          event: eventFromQr,
+          kategori: categoryNama,
+          pemegang: pemegangName,
+        });
+      }
+    }
 
     const responsePayload = {
       valid: true,
@@ -645,6 +710,31 @@ const checkInTiket = async (req, res) => {
   }
 };
 
+// Reset / Bersihkan memori tiket yang sudah di-scan (untuk testing atau reset sesi gate)
+const resetScannedTickets = async (req, res) => {
+  try {
+    const { code } = req.body || {};
+    if (code) {
+      const cleanCode = String(code).trim().toUpperCase();
+      checkedInTicketCodes.delete(cleanCode);
+      checkedInTicketDetails.delete(cleanCode);
+      return res.json({
+        success: true,
+        message: `Status scan untuk tiket ${cleanCode} berhasil di-reset.`,
+      });
+    }
+
+    checkedInTicketCodes.clear();
+    checkedInTicketDetails.clear();
+    return res.json({
+      success: true,
+      message: "Seluruh riwayat scan tiket berhasil dibersihkan.",
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   buatPesanan,
   riwayatPesanan,
@@ -653,4 +743,5 @@ module.exports = {
   getAllOrdersAdmin,
   checkInTiket,
   getTicketStatus,
+  resetScannedTickets,
 };

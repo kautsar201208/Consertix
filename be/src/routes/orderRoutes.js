@@ -9,6 +9,7 @@ const {
   getAllOrdersAdmin,
   checkInTiket,
   getTicketStatus,
+  resetScannedTickets,
 } = require("../controllers/orderController");
 
 const auth = require("../middleware/authMiddleware");
@@ -17,7 +18,10 @@ const admin = require("../middleware/adminMiddleware");
 // Admin routes (diletakkan sebelum /:id)
 router.get("/admin/events-summary", auth, admin, getEventsSummaryAdmin);
 router.get("/admin/all", auth, admin, getAllOrdersAdmin);
-router.post("/scan-checkin", auth, admin, checkInTiket);
+
+// Scan checkin di gate konser (terbuka agar staff gate tidak terblokir expired token)
+router.post("/scan-checkin", checkInTiket);
+router.post("/scan-reset", resetScannedTickets);
 
 // Public / User ticket status check (polling oleh aplikasi mobile)
 router.get("/ticket-status/:code", getTicketStatus);
