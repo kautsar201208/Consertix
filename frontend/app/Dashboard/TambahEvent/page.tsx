@@ -1122,16 +1122,24 @@ export default function TambahEventPage() {
                 <form onSubmit={handleSaveTier} className="space-y-4 text-xs">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Nama Tier / Kategori</label>
-                    <input
-                      type="text"
+                    <select
                       required
                       value={tierForm.nama_kategori}
                       onChange={(e) =>
                         setTierForm({ ...tierForm, nama_kategori: e.target.value })
                       }
-                      placeholder="Contoh: VIP Pass, Early Bird, Reguler"
                       className="w-full px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 text-xs focus:outline-none focus:bg-white focus:border-[#111844]"
-                    />
+                    >
+                      <option value="" disabled>
+                        Pilih nama tier
+                      </option>
+                      <option value="VVIP">VVIP</option>
+                      <option value="VIP">VIP</option>
+                      <option value="Festival">Festival</option>
+                      <option value="CAT 1">CAT 1</option>
+                      <option value="CAT 2">CAT 2</option>
+                      <option value="CAT 3">CAT 3</option>
+                    </select>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
