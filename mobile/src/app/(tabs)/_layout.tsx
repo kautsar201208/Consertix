@@ -40,12 +40,25 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="transaksi"
         options={{
-          title: 'Explore',
+          title: 'Transaksi',
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name={focused ? 'compass' : 'compass-outline'}
+              name={focused ? 'receipt' : 'receipt-outline'}
+              size={size}
+              color={color as string}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Akun',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'person' : 'person-outline'}
               size={size}
               color={color as string}
             />

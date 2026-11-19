@@ -95,6 +95,21 @@ export default function ExploreScreen() {
 
         {/* Menu Section */}
         <View style={styles.menuSection}>
+          <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>AKTIVITAS & PESANAN</Text>
+
+          <View style={[styles.menuContainer, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 20 }]}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => router.push('/(tabs)/transaksi' as any)}
+            >
+              <View style={styles.menuLeft}>
+                <Ionicons name="receipt-outline" size={22} color={colors.accent} />
+                <Text style={[styles.menuText, { color: colors.text }]}>Riwayat Transaksi Tiket</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.placeholder} />
+            </TouchableOpacity>
+          </View>
+
           <Text style={[styles.menuSectionTitle, { color: colors.textSecondary }]}>PENGATURAN</Text>
 
           <View style={[styles.menuContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>

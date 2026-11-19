@@ -198,7 +198,7 @@ const riwayatPesanan = async (req, res) => {
     const { data: categories, error: categoriesError } =
       await supabase
         .from("ticket_categories")
-        .select("id, event_id, nama_kategori")
+        .select("id, event_id, nama_kategori, harga")
         .in("id", categoryIds);
 
     if (categoriesError) throw categoriesError;
@@ -214,7 +214,7 @@ const riwayatPesanan = async (req, res) => {
     if (eventIds.length > 0) {
       const { data, error: eventsError } = await supabase
         .from("events")
-        .select("id, judul")
+        .select("id, judul, lokasi, tanggal, jam, poster")
         .in("id", eventIds);
 
       if (eventsError) throw eventsError;
@@ -248,7 +248,12 @@ const riwayatPesanan = async (req, res) => {
       return {
         ...order,
         nama_kategori: category?.nama_kategori ?? null,
+        harga_kategori: category?.harga ?? null,
         judul: event?.judul ?? null,
+        lokasi: event?.lokasi ?? null,
+        tanggal: event?.tanggal ?? null,
+        jam: event?.jam ?? null,
+        poster: event?.poster ?? null,
       };
     });
 

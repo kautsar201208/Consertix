@@ -9,12 +9,14 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '@/config/api';
 import { storage } from '@/utils/storage';
+import { WebView } from 'react-native-webview';
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -75,8 +77,93 @@ export default function PaymentScreen() {
   const [voucherCodeInput, setVoucherCodeInput] = useState('');
   const [withProtection, setWithProtection] = useState(true);
 
-  // 5. Loading proses bayar
+  // 5. Loading proses bayar & State Modal Midtrans
   const [isProcessing, setIsProcessing] = useState(false);
+  const [snapUrl, setSnapUrl] = useState<string | null>(null);
+  const [showSnapModal, setShowSnapModal] = useState(false);
+  const [pendingOrderParams, setPendingOrderParams] = useState<any>(null);
+  const [midtransOrderId, setMidtransOrderId] = useState<string | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+
+  const handleSimulateSandboxPayment = async () => {
+    if (!midtransOrderId) return;
+    try {
+      const token = await storage.getItem('token');
+      const res = await fetch(`${API_URL}/api/payments/simulate-sandbox-pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ midtrans_order_id: midtransOrderId }),
+      });
+      if (res.ok) {
+        setPaymentConfirmed(true);
+        setTimeout(() => {
+          setShowSnapModal(false);
+          if (pendingOrderParams) {
+            router.replace({
+              pathname: '/checkout/success' as any,
+              params: pendingOrderParams,
+            });
+          }
+        }, 1200);
+      }
+    } catch (e) {
+      console.warn('Simulasi error:', e);
+    }
+  };
+
+  // Polling status pembayaran Midtrans setiap 4 detik selagi modal terbuka
+  useEffect(() => {
+    if (!showSnapModal || !midtransOrderId || paymentConfirmed) return;
+
+    setIsPolling(true);
+    let isMounted = true;
+
+    const pollStatus = async () => {
+      try {
+        const token = await storage.getItem('token');
+        const res = await fetch(
+          `${API_URL}/api/payments/midtrans-status/${encodeURIComponent(midtransOrderId)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (isMounted && data?.is_paid) {
+          setPaymentConfirmed(true);
+          setIsPolling(false);
+        }
+      } catch (_) {
+        // silent
+      }
+    };
+
+    const interval = setInterval(pollStatus, 3500);
+    pollStatus(); // jalankan langsung sekali
+
+    return () => {
+      isMounted = false;
+      setIsPolling(false);
+      clearInterval(interval);
+    };
+  }, [showSnapModal, midtransOrderId, paymentConfirmed]);
+
+  // Otomatis navigasi ke e-tiket begitu pembayaran terkonfirmasi (settlement)
+  useEffect(() => {
+    if (paymentConfirmed && pendingOrderParams) {
+      const timer = setTimeout(() => {
+        setShowSnapModal(false);
+        router.replace({
+          pathname: '/checkout/success' as any,
+          params: pendingOrderParams,
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [paymentConfirmed, pendingOrderParams]);
 
   // Kalkulasi Harga
   const ticketCount = parseInt(params.quantity || '1', 10);
@@ -87,6 +174,38 @@ export default function PaymentScreen() {
   const protectionFee = withProtection ? 30000 : 0;
   const tax = Math.round(subtotal * 0.1);
   const totalBill = Math.max(0, subtotal - voucherDiscount + serviceFee + protectionFee + tax);
+
+  const getPaymentMethodLabel = () => {
+    switch (paymentMethod) {
+      case 'bca_va':
+        return 'BCA Virtual Account';
+      case 'mandiri_va':
+        return 'Bank Mandiri Virtual Account';
+      case 'gopay':
+        return 'GoPay / GoPay Later';
+      case 'cc':
+        return 'Kartu Kredit / Debit';
+      case 'qris':
+      default:
+        return 'QRIS Instant';
+    }
+  };
+
+  const getModalSubtitle = () => {
+    switch (paymentMethod) {
+      case 'bca_va':
+        return 'Salin Nomor BCA Virtual Account';
+      case 'mandiri_va':
+        return 'Salin Kode & Nomor Mandiri VA';
+      case 'gopay':
+        return 'Buka Aplikasi GoPay untuk Membayar';
+      case 'cc':
+        return 'Masukkan Data Kartu Kredit / Debit';
+      case 'qris':
+      default:
+        return 'Scan QR Code QRIS';
+    }
+  };
 
   const handleApplyVoucher = () => {
     const code = voucherCodeInput.trim().toUpperCase();
@@ -108,7 +227,7 @@ export default function PaymentScreen() {
       const firstName = nameParts[0] || 'Pemesan';
       const lastName = nameParts.slice(1).join(' ') || firstName;
 
-      // Request API buatPesanan di backend
+      // 1. Request API buatPesanan di backend
       const res = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
         headers: {
@@ -130,38 +249,71 @@ export default function PaymentScreen() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || 'Gagal memproses pembayaran');
+        throw new Error(data.message || 'Gagal memproses pesanan');
       }
 
-      // Sukses pembayaran -> Beralih ke Langkah 3 (E-Tiket)
+      // Sukses membuat pesanan di database
       const orderId = data?.order_id
         ? String(data.order_id)
         : String(Math.floor(100000 + Math.random() * 900000));
 
-      router.replace({
-        pathname: '/checkout/success' as any,
-        params: {
-          orderId,
-          eventTitle: params.eventTitle,
-          eventDate: params.eventDate,
-          eventLocation: params.eventLocation,
-          poster: params.poster,
-          ticketName: params.ticketName,
-          ticketPrice: params.ticketPrice,
-          quantity: String(ticketCount),
-          namaLengkap: params.namaLengkap,
-          email: params.email,
-          phone: params.phone,
-          idNumber: params.idNumber,
-          paymentMethod,
-          totalAmount: String(totalBill),
+      const orderParams = {
+        orderId,
+        eventTitle: params.eventTitle,
+        eventDate: params.eventDate,
+        eventLocation: params.eventLocation,
+        poster: params.poster,
+        ticketName: params.ticketName,
+        ticketPrice: params.ticketPrice,
+        quantity: String(ticketCount),
+        namaLengkap: params.namaLengkap,
+        email: params.email,
+        phone: params.phone,
+        idNumber: params.idNumber,
+        paymentMethod: getPaymentMethodLabel(),
+        totalAmount: String(totalBill),
+      };
+
+      setPendingOrderParams(orderParams);
+
+      // 2. Minta Snap Token / URL Pembayaran dari Midtrans
+      const midtransRes = await fetch(`${API_URL}/api/payments/midtrans-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({
+          order_id: orderId,
+          gross_amount: totalBill,
+          item_name: `${ticketCount}x ${params.ticketName || 'Tiket'} - ${params.eventTitle || 'Konser'}`,
+          customer_name: params.namaLengkap || 'Pengunjung',
+          customer_email: params.email || 'customer@concertix.id',
+          customer_phone: params.phone || '081234567890',
+          payment_method: paymentMethod,
+        }),
       });
+
+      if (!midtransRes.ok) {
+        const errData = await midtransRes.json();
+        throw new Error(errData.message || 'Gagal menyiapkan halaman pembayaran Midtrans');
+      }
+
+      const midtransData = await midtransRes.json();
+      if (midtransData?.redirect_url) {
+        // Tampilkan halaman pembayaran Midtrans (QRIS/VA) di modal in-app WebView
+        setSnapUrl(midtransData.redirect_url);
+        setMidtransOrderId(midtransData.order_id || null);
+        setPaymentConfirmed(false);
+        setShowSnapModal(true);
+      } else {
+        throw new Error('URL pembayaran Midtrans tidak ditemukan');
+      }
     } catch (err: any) {
       console.error('Payment Error:', err);
       Alert.alert(
         'Gagal Memproses Pesanan',
-        err.message || 'Terjadi kesalahan saat membuat pesanan. Pastikan backend aktif.'
+        err.message || 'Terjadi kesalahan saat memproses pembayaran. Pastikan backend aktif.'
       );
     } finally {
       setIsProcessing(false);
@@ -785,6 +937,168 @@ export default function PaymentScreen() {
           Dengan bayar, kamu menyetujui S&K Pembelian Concertix
         </Text>
       </View>
+
+      {/* 12. Modal Midtrans Snap Payment (QRIS / VA / E-Wallet) */}
+      <Modal
+        visible={showSnapModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => {
+          if (paymentConfirmed) return;
+          Alert.alert(
+            'Tutup Halaman Pembayaran?',
+            'Pembayaran belum dikonfirmasi. Tutup halaman ini?',
+            [
+              { text: 'Lanjut Bayar', style: 'cancel' },
+              {
+                text: 'Tutup',
+                style: 'destructive',
+                onPress: () => setShowSnapModal(false),
+              },
+            ]
+          );
+        }}
+      >
+        <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
+          {/* Header Modal */}
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => {
+                if (paymentConfirmed) {
+                  setShowSnapModal(false);
+                  return;
+                }
+                Alert.alert(
+                  'Tutup Pembayaran?',
+                  'Pembayaran belum dikonfirmasi oleh sistem. Tutup?',
+                  [
+                    { text: 'Lanjut Bayar', style: 'cancel' },
+                    {
+                      text: 'Tutup',
+                      style: 'destructive',
+                      onPress: () => setShowSnapModal(false),
+                    },
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="close" size={22} color="#131B2E" />
+            </TouchableOpacity>
+
+            <View style={styles.modalHeaderCenter}>
+              {paymentConfirmed ? (
+                <>
+                  <Text style={[styles.modalHeaderTitle, { color: '#059669' }]}>✓ Pembayaran Berhasil!</Text>
+                  <Text style={styles.modalHeaderSubtitle}>Mengalihkan ke tiket...</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.modalHeaderTitle}>{getPaymentMethodLabel()}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    {isPolling && <ActivityIndicator size={10} color="#004AC6" />}
+                    <Text style={styles.modalHeaderSubtitle}>
+                      {isPolling ? 'Menunggu konfirmasi...' : getModalSubtitle()}
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.modalDoneBtn, !paymentConfirmed && { backgroundColor: '#2563EB' }]}
+              onPress={() => {
+                if (!paymentConfirmed) {
+                  Alert.alert(
+                    'Mode Sandbox (Uji Coba)',
+                    'Pembayaran uang riil (DANA/BCA asli) tidak masuk ke akun Sandbox Midtrans. Apakah Anda ingin mensimulasikan pembayaran Berhasil (Lunas) sekarang?',
+                    [
+                      { text: 'Tunggu Cek', style: 'cancel' },
+                      {
+                        text: 'Simulasi Bayar Lunas',
+                        onPress: handleSimulateSandboxPayment,
+                      },
+                    ]
+                  );
+                  return;
+                }
+                setShowSnapModal(false);
+                if (pendingOrderParams) {
+                  router.replace({
+                    pathname: '/checkout/success' as any,
+                    params: pendingOrderParams,
+                  });
+                }
+              }}
+            >
+              <Text style={styles.modalDoneBtnText}>
+                {paymentConfirmed ? '✓ Lihat Tiket' : 'Simulasi Bayar'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Paid Banner */}
+          {paymentConfirmed && (
+            <View style={styles.paidBanner}>
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+              <Text style={styles.paidBannerText}>Pembayaran berhasil dikonfirmasi! Tiket sedang disiapkan...</Text>
+            </View>
+          )}
+
+          {/* WebView Midtrans Snap */}
+          {snapUrl && !paymentConfirmed ? (
+            <WebView
+              source={{ uri: snapUrl }}
+              style={styles.webView}
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View style={styles.webViewLoading}>
+                  <ActivityIndicator size="large" color="#004AC6" />
+                  <Text style={styles.webViewLoadingText}>Memuat Halaman Pembayaran Midtrans...</Text>
+                </View>
+              )}
+              onNavigationStateChange={(navState) => {
+                const url = (navState.url || '').toLowerCase();
+                // Deteksi URL finish/success dari callback Midtrans
+                if (
+                  url.includes('/finish') ||
+                  url.includes('status_code=200') ||
+                  url.includes('transaction_status=settlement') ||
+                  url.includes('transaction_status=capture') ||
+                  url.includes('concertix.app/payment/finish')
+                ) {
+                  setPaymentConfirmed(true);
+                }
+              }}
+            />
+          ) : null}
+
+          {/* Loading confirmed state */}
+          {paymentConfirmed && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.webViewLoading}
+              onPress={() => {
+                setShowSnapModal(false);
+                if (pendingOrderParams) {
+                  router.replace({
+                    pathname: '/checkout/success' as any,
+                    params: pendingOrderParams,
+                  });
+                }
+              }}
+            >
+              <ActivityIndicator size="large" color="#059669" />
+              <Text style={[styles.webViewLoadingText, { color: '#059669' }]}>
+                Pembayaran dikonfirmasi! Menyiapkan tiket Anda...
+              </Text>
+              <Text style={{ fontSize: 12, color: '#004AC6', marginTop: 8, fontWeight: '700' }}>
+                Ketuk di sini untuk langsung buka E-Tiket →
+              </Text>
+            </TouchableOpacity>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1629,5 +1943,86 @@ const styles = StyleSheet.create({
     color: '#737686',
     textAlign: 'center',
     paddingBottom: 2,
+  },
+  /* Modal Midtrans WebView */
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAEDFF',
+  },
+  modalCloseBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F2F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalHeaderCenter: {
+    alignItems: 'center',
+  },
+  modalHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#131B2E',
+  },
+  modalHeaderSubtitle: {
+    fontSize: 11,
+    color: '#004AC6',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  modalDoneBtn: {
+    backgroundColor: '#004AC6',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  modalDoneBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  webView: {
+    flex: 1,
+  },
+  webViewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    gap: 12,
+  },
+  webViewLoadingText: {
+    fontSize: 13,
+    color: '#434655',
+    fontWeight: '600',
+  },
+  paidBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#059669',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  paidBannerText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
   },
 });
