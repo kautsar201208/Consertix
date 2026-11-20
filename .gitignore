@@ -1,8 +1,25 @@
+
 # Environment variables
-be/.env
 .env
+.env.*
+!.env.example
+
+# Ignore backend environment files
+be/.env
+be/.env.*
+!be/.env.example
+
+# Jika tidak ingin mengirim env.example
+be/.env.example
 
 # Dependencies
 node_modules/
-be/node_modules/
-frontend/node_modules/
+**/node_modules/
+
+# Build outputs
+.next/
+dist/
+build/
+
+# Logs
+*.log

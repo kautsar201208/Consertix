@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/context/AuthContext';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -20,7 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RegisterScreen() {
-  const [nama, setNama] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -36,8 +36,10 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     setErrorMessage('');
 
-    if (!nama.trim()) {
-      setErrorMessage('Harap masukkan nama lengkap Anda');
+    const nama = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+
+    if (!firstName.trim()) {
+      setErrorMessage('Harap masukkan nama depan Anda');
       return;
     }
     if (!email.trim()) {
@@ -82,195 +84,176 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <View style={styles.headerContainer}>
+          <View style={[styles.hero, { backgroundColor: colors.tint }]}>
+            <View style={styles.heroShapeLeft} />
+            <View style={styles.heroShapeRight} />
             <TouchableOpacity
               style={[styles.backButton, { backgroundColor: colors.backgroundElement }]}
               onPress={() => router.back()}
+              accessibilityLabel="Kembali"
             >
               <Ionicons name="arrow-back" size={20} color={colors.text} />
             </TouchableOpacity>
 
-            <View style={[styles.logoBadge, { backgroundColor: colors.tint }]}>
-              <Ionicons name="person-add" size={28} color="#FFFFFF" />
+            <View style={styles.logoBadge}>
+              <Ionicons name="person-add" size={24} color="#FFFFFF" />
             </View>
-            <ThemedText type="title" style={styles.brandTitle}>
-              Daftar Akun
+            <ThemedText style={styles.heroTitle}>
+              Buat akun baru
             </ThemedText>
-            <ThemedText style={[styles.subtitleText, { color: colors.textSecondary }]}>
-              Buat akun untuk memesan tiket konser impianmu
+            <ThemedText style={styles.heroSubtitle}>
+              Bergabung dan temukan pengalaman konser favoritmu
             </ThemedText>
           </View>
 
-          {/* Error Banner */}
-          {errorMessage ? (
-            <View style={[styles.errorBanner, { backgroundColor: colors.error + '15', borderColor: colors.error + '40' }]}>
-              <Ionicons name="alert-circle" size={18} color={colors.error} />
-              <ThemedText style={[styles.errorText, { color: colors.error }]}>
-                {errorMessage}
-              </ThemedText>
-            </View>
-          ) : null}
+          <View
+            style={[
+              styles.formCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <ThemedText style={[styles.formTitle, { color: colors.text }]}>
+              Daftar dengan email
+            </ThemedText>
+            <ThemedText style={[styles.formSubtitle, { color: colors.textSecondary }]}>
+              Isi data berikut untuk membuat akun Concertix.
+            </ThemedText>
 
-          {/* Form */}
-          <View style={styles.formContainer}>
-            {/* Nama Field */}
-            <View style={styles.inputGroup}>
-              <ThemedText style={[styles.label, { color: colors.text }]}>Nama Lengkap</ThemedText>
+            {errorMessage ? (
               <View
                 style={[
-                  styles.inputWrapper,
+                  styles.errorBanner,
                   {
-                    backgroundColor: colors.backgroundElement,
-                    borderColor: colors.border,
+                    backgroundColor: colors.error + '15',
+                    borderColor: colors.error + '40',
                   },
                 ]}
               >
-                <Ionicons
-                  name="person-outline"
-                  size={20}
-                  color={colors.placeholder}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="Nama Lengkap Anda"
-                  placeholderTextColor={colors.placeholder}
-                  value={nama}
-                  onChangeText={(val) => {
-                    setNama(val);
-                    if (errorMessage) setErrorMessage('');
-                  }}
-                  autoCapitalize="words"
-                  editable={!loading}
-                />
+                <Ionicons name="alert-circle" size={18} color={colors.error} />
+                <ThemedText style={[styles.errorText, { color: colors.error }]}>
+                  {errorMessage}
+                </ThemedText>
               </View>
+            ) : null}
+
+            <View style={styles.nameRow}>
+              <TextInput
+                style={[
+                  styles.nameInput,
+                  { backgroundColor: colors.backgroundElement, color: colors.text },
+                ]}
+                placeholder="Nama depan"
+                placeholderTextColor={colors.placeholder}
+                value={firstName}
+                onChangeText={(val) => {
+                  setFirstName(val);
+                  if (errorMessage) setErrorMessage('');
+                }}
+                autoCapitalize="words"
+                editable={!loading}
+                accessibilityLabel="Nama depan"
+                returnKeyType="next"
+              />
+              <TextInput
+                style={[
+                  styles.nameInput,
+                  { backgroundColor: colors.backgroundElement, color: colors.text },
+                ]}
+                placeholder="Nama belakang"
+                placeholderTextColor={colors.placeholder}
+                value={lastName}
+                onChangeText={(val) => {
+                  setLastName(val);
+                  if (errorMessage) setErrorMessage('');
+                }}
+                autoCapitalize="words"
+                editable={!loading}
+                accessibilityLabel="Nama belakang"
+                returnKeyType="next"
+              />
             </View>
 
-            {/* Email Field */}
             <View style={styles.inputGroup}>
-              <ThemedText style={[styles.label, { color: colors.text }]}>Email</ThemedText>
-              <View
+              <TextInput
                 style={[
-                  styles.inputWrapper,
-                  {
-                    backgroundColor: colors.backgroundElement,
-                    borderColor: colors.border,
-                  },
+                  styles.input,
+                  { backgroundColor: colors.backgroundElement, color: colors.text },
                 ]}
+                placeholder="Email"
+                placeholderTextColor={colors.placeholder}
+                value={email}
+                onChangeText={(val) => {
+                  setEmail(val);
+                  if (errorMessage) setErrorMessage('');
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+                accessibilityLabel="Email"
+                returnKeyType="next"
+              />
+            </View>
+
+            <View style={[styles.passwordWrapper, { backgroundColor: colors.backgroundElement }]}>
+              <TextInput
+                style={[styles.input, styles.passwordInput, { color: colors.text }]}
+                placeholder="Kata sandi (minimal 6 karakter)"
+                placeholderTextColor={colors.placeholder}
+                value={password}
+                onChangeText={(val) => {
+                  setPassword(val);
+                  if (errorMessage) setErrorMessage('');
+                }}
+                secureTextEntry={!showPassword}
+                editable={!loading}
+                accessibilityLabel="Kata sandi"
+                returnKeyType="next"
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                disabled={loading}
+                style={[styles.eyeIcon, { borderLeftColor: colors.border }]}
+                accessibilityLabel={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
               >
                 <Ionicons
-                  name="mail-outline"
-                  size={20}
-                  color={colors.placeholder}
-                  style={styles.inputIcon}
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={19}
+                  color={colors.textSecondary}
                 />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="nama@email.com"
-                  placeholderTextColor={colors.placeholder}
-                  value={email}
-                  onChangeText={(val) => {
-                    setEmail(val);
-                    if (errorMessage) setErrorMessage('');
-                  }}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!loading}
-                />
-              </View>
+              </TouchableOpacity>
             </View>
 
-            {/* Password Field */}
-            <View style={styles.inputGroup}>
-              <ThemedText style={[styles.label, { color: colors.text }]}>Password</ThemedText>
-              <View
-                style={[
-                  styles.inputWrapper,
-                  {
-                    backgroundColor: colors.backgroundElement,
-                    borderColor: colors.border,
-                  },
-                ]}
+            <View style={[styles.passwordWrapper, { backgroundColor: colors.backgroundElement }]}>
+              <TextInput
+                style={[styles.input, styles.passwordInput, { color: colors.text }]}
+                placeholder="Konfirmasi kata sandi"
+                placeholderTextColor={colors.placeholder}
+                value={confirmPassword}
+                onChangeText={(val) => {
+                  setConfirmPassword(val);
+                  if (errorMessage) setErrorMessage('');
+                }}
+                secureTextEntry={!showConfirmPassword}
+                editable={!loading}
+                accessibilityLabel="Konfirmasi kata sandi"
+                returnKeyType="done"
+                onSubmitEditing={handleRegister}
+              />
+              <TouchableOpacity
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                disabled={loading}
+                style={[styles.eyeIcon, { borderLeftColor: colors.border }]}
+                accessibilityLabel={showConfirmPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
               >
                 <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color={colors.placeholder}
-                  style={styles.inputIcon}
+                  name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={19}
+                  color={colors.textSecondary}
                 />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="Minimal 6 karakter"
-                  placeholderTextColor={colors.placeholder}
-                  value={password}
-                  onChangeText={(val) => {
-                    setPassword(val);
-                    if (errorMessage) setErrorMessage('');
-                  }}
-                  secureTextEntry={!showPassword}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                  style={styles.eyeIcon}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={20}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             </View>
 
-            {/* Confirm Password Field */}
-            <View style={styles.inputGroup}>
-              <ThemedText style={[styles.label, { color: colors.text }]}>Konfirmasi Password</ThemedText>
-              <View
-                style={[
-                  styles.inputWrapper,
-                  {
-                    backgroundColor: colors.backgroundElement,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="shield-checkmark-outline"
-                  size={20}
-                  color={colors.placeholder}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="Ulangi password Anda"
-                  placeholderTextColor={colors.placeholder}
-                  value={confirmPassword}
-                  onChangeText={(val) => {
-                    setConfirmPassword(val);
-                    if (errorMessage) setErrorMessage('');
-                  }}
-                  secureTextEntry={!showConfirmPassword}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  disabled={loading}
-                  style={styles.eyeIcon}
-                >
-                  <Ionicons
-                    name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={20}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Submit Button */}
             <TouchableOpacity
               style={[
                 styles.submitButton,
@@ -286,11 +269,10 @@ export default function RegisterScreen() {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <ThemedText style={styles.submitButtonText}>Daftar Sekarang</ThemedText>
+                <ThemedText style={styles.submitButtonText}>Buat Akun</ThemedText>
               )}
             </TouchableOpacity>
 
-            {/* Login Link */}
             <View style={styles.loginContainer}>
               <ThemedText style={{ color: colors.textSecondary }}>
                 Sudah punya akun?{' '}
@@ -298,7 +280,7 @@ export default function RegisterScreen() {
               <Link href="/login" asChild>
                 <TouchableOpacity>
                   <ThemedText style={[styles.linkBold, { color: colors.accent }]}>
-                    Masuk di sini
+                    Masuk
                   </ThemedText>
                 </TouchableOpacity>
               </Link>
@@ -319,122 +301,181 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
     paddingVertical: 24,
   },
-  headerContainer: {
+  hero: {
+    width: '100%',
+    minHeight: 226,
     alignItems: 'center',
-    marginBottom: 26,
-    position: 'relative',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 24,
+    paddingTop: 62,
+    paddingBottom: 70,
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  heroShapeLeft: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    left: -64,
+    bottom: -34,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  heroShapeRight: {
+    position: 'absolute',
+    width: 112,
+    height: 112,
+    right: -48,
+    bottom: -18,
+    borderRadius: 56,
+    backgroundColor: 'rgba(180,197,255,0.45)',
   },
   backButton: {
     position: 'absolute',
-    left: 0,
-    top: 4,
+    left: 16,
+    top: 16,
     width: 38,
     height: 38,
-    borderRadius: 12,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
   },
   logoBadge: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    marginBottom: 10,
   },
-  brandTitle: {
-    fontSize: 26,
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 25,
     fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  subtitleText: {
-    fontSize: 14,
+    letterSpacing: -0.4,
     textAlign: 'center',
-    maxWidth: 290,
+  },
+  heroSubtitle: {
+    color: '#DBEAFE',
+    fontSize: 12,
+    textAlign: 'center',
+    maxWidth: 280,
+    marginTop: 5,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    borderRadius: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    marginBottom: 18,
+    marginTop: 16,
   },
   errorText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
     flex: 1,
   },
-  formContainer: {
+  formCard: {
     width: '100%',
+    maxWidth: 500,
+    marginTop: -48,
+    padding: 20,
+    borderWidth: 1,
+    borderRadius: 24,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 20,
+    elevation: 4,
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  formSubtitle: {
+    fontSize: 12,
+    marginTop: 3,
+    marginBottom: 6,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  nameInput: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 50,
+    borderRadius: 26,
+    paddingHorizontal: 13,
+    fontSize: 13,
   },
   inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    minHeight: 50,
-  },
-  inputIcon: {
-    marginRight: 10,
+    marginTop: 14,
   },
   input: {
-    flex: 1,
-    fontSize: 15,
-    paddingVertical: 12,
+    minHeight: 50,
+    borderRadius: 26,
+    paddingHorizontal: 17,
+    fontSize: 13,
   },
   eyeIcon: {
-    padding: 6,
-  },
-  submitButton: {
-    borderRadius: 14,
-    paddingVertical: 15,
+    width: 46,
+    minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+  },
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 50,
+    marginTop: 12,
+    borderRadius: 26,
+    overflow: 'hidden',
+  },
+  passwordInput: {
+    flex: 1,
+    minHeight: 50,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+  },
+  submitButton: {
+    borderRadius: 28,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
     minHeight: 52,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
+    shadowColor: '#004AC6',
+    shadowOpacity: 0.18,
     shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 6,
-    elevation: 2,
+    shadowRadius: 9,
+    elevation: 3,
   },
   submitButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
   },
   loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 22,
-    paddingBottom: 20,
+    marginTop: 20,
   },
   linkBold: {
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
 });
 

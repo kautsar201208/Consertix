@@ -32,6 +32,7 @@ const tambahEvent = async (req, res) => {
     jam_selesai,
     open_gate,
     lokasi,
+    kategori,
     status,
     ticket_categories: ticketCategoriesPayload,
   } = req.body;

@@ -1,14 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
+  Modal,
+  Pressable,
+  ScrollView,
   StyleSheet,
   View,
   Text,
+  TextInput,
   FlatList,
   TouchableOpacity,
   Image,
   ActivityIndicator,
   RefreshControl,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -39,14 +42,33 @@ interface OrderItem {
   poster?: string | null;
 }
 
+type OrderFilter = 'all' | 'success' | 'pending' | 'cancelled';
+type DateFilter = 'all' | '30days' | '7days';
+
+const getOrderState = (status?: string): Exclude<OrderFilter, 'all'> => {
+  const normalizedStatus = status?.toLowerCase();
+  if (!normalizedStatus || ['paid', 'success', 'verified', 'settlement'].includes(normalizedStatus)) {
+    return 'success';
+  }
+  if (['cancelled', 'canceled', 'rejected', 'expired', 'expire', 'deny'].includes(normalizedStatus)) {
+    return 'cancelled';
+  }
+  return 'pending';
+};
+
 export default function RiwayatTransaksiScreen() {
   const router = useRouter();
   const { isLoggedIn, user } = useAuth();
+  const searchInputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'success' | 'pending'>('all');
+  const [activeFilter, setActiveFilter] = useState<OrderFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [sortNewestFirst, setSortNewestFirst] = useState(true);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
 
   const fetchOrders = useCallback(async (isSilent = false) => {
     if (!isLoggedIn) {
@@ -111,15 +133,21 @@ export default function RiwayatTransaksiScreen() {
     return 'Rp' + Number(val || 0).toLocaleString('id-ID');
   };
 
-  const formatDate = (dateStr?: string) => {
+  const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '';
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString('id-ID', {
+      if (Number.isNaN(d.getTime())) return dateStr;
+      const date = d.toLocaleDateString('id-ID', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
       });
+      const time = d.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      return `${date}, ${time} WIB`;
     } catch {
       return dateStr;
     }
@@ -152,71 +180,148 @@ export default function RiwayatTransaksiScreen() {
     });
   };
 
-  const filteredOrders = orders.filter((o) => {
-    if (activeFilter === 'all') return true;
-    const isSuccess = !o.status || o.status.toLowerCase() === 'paid' || o.status.toLowerCase() === 'success' || o.status.toLowerCase() === 'verified';
-    if (activeFilter === 'success') return isSuccess;
-    if (activeFilter === 'pending') return !isSuccess;
-    return true;
-  });
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredOrders = orders
+    .filter((order) => {
+      if (activeFilter !== 'all' && getOrderState(order.status) !== activeFilter) return false;
+
+      if (normalizedQuery) {
+        const searchableText = [
+          order.id,
+          order.judul,
+          order.nama_kategori,
+          order.lokasi,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!searchableText.includes(normalizedQuery)) return false;
+      }
+
+      if (dateFilter !== 'all') {
+        const createdAt = new Date(order.created_at).getTime();
+        const dayLimit = dateFilter === '7days' ? 7 : 30;
+        if (!Number.isFinite(createdAt) || Date.now() - createdAt > dayLimit * 24 * 60 * 60 * 1000) {
+          return false;
+        }
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const aTime = new Date(a.created_at).getTime();
+      const bTime = new Date(b.created_at).getTime();
+      return sortNewestFirst ? bTime - aTime : aTime - bTime;
+    });
+
+  const statusCounts = {
+    all: orders.length,
+    success: orders.filter((order) => getOrderState(order.status) === 'success').length,
+    pending: orders.filter((order) => getOrderState(order.status) === 'pending').length,
+    cancelled: orders.filter((order) => getOrderState(order.status) === 'cancelled').length,
+  };
+  const dateFilterLabel =
+    dateFilter === '7days' ? '7 Hari Terakhir' : dateFilter === '30days' ? '30 Hari Terakhir' : 'Semua Waktu';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.brandBadge}>
-            <Ionicons name="receipt-outline" size={18} color="#FFFFFF" />
-          </View>
-          <View>
-            <Text style={styles.brandTitle}>Riwayat Transaksi</Text>
-            <Text style={styles.brandSub}>Tiket & riwayat pemesanan Anda</Text>
-          </View>
+        <Text style={styles.brandTitle}>Riwayat Transaksi</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            accessibilityLabel="Cari transaksi"
+            onPress={() => searchInputRef.current?.focus()}
+          >
+            <Ionicons name="search" size={21} color="#434655" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            accessibilityLabel="Filter transaksi"
+            onPress={() => setShowFilterSheet(true)}
+          >
+            <Ionicons name="options-outline" size={21} color="#434655" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.profileBadge}
+            accessibilityLabel="Buka akun"
+            onPress={() => router.push('/(tabs)/explore')}
+          >
+            <Ionicons name="person" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh} activeOpacity={0.7}>
-          <Ionicons name="refresh-outline" size={18} color="#004AC6" />
-        </TouchableOpacity>
       </View>
 
-      {/* Filter Tabs */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[styles.filterChip, activeFilter === 'all' && styles.filterChipActive]}
-          onPress={() => setActiveFilter('all')}
-        >
-          <Text style={[styles.filterText, activeFilter === 'all' && styles.filterTextActive]}>
-            Semua ({orders.length})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.filterChip, activeFilter === 'success' && styles.filterChipActive]}
-          onPress={() => setActiveFilter('success')}
-        >
-          <Ionicons
-            name="checkmark-circle"
-            size={13}
-            color={activeFilter === 'success' ? '#FFFFFF' : '#10B981'}
+      <View style={styles.controls}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={19} color="#737686" />
+          <TextInput
+            ref={searchInputRef}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Cari event atau nomor transaksi..."
+            placeholderTextColor="#737686"
+            style={styles.searchInput}
+            returnKeyType="search"
           />
-          <Text style={[styles.filterText, activeFilter === 'success' && styles.filterTextActive]}>
-            Berhasil
-          </Text>
-        </TouchableOpacity>
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              accessibilityLabel="Hapus pencarian"
+              onPress={() => setSearchQuery('')}
+            >
+              <Ionicons name="close-circle" size={18} color="#737686" />
+            </TouchableOpacity>
+          )}
+        </View>
 
-        <TouchableOpacity
-          style={[styles.filterChip, activeFilter === 'pending' && styles.filterChipActive]}
-          onPress={() => setActiveFilter('pending')}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
         >
-          <Ionicons
-            name="time-outline"
-            size={13}
-            color={activeFilter === 'pending' ? '#FFFFFF' : '#F59E0B'}
-          />
-          <Text style={[styles.filterText, activeFilter === 'pending' && styles.filterTextActive]}>
-            Menunggu
+          {([
+            { key: 'all', label: 'Semua', count: statusCounts.all },
+            { key: 'success', label: 'Berhasil', count: statusCounts.success },
+            { key: 'pending', label: 'Menunggu Pembayaran', count: statusCounts.pending },
+            { key: 'cancelled', label: 'Dibatalkan', count: statusCounts.cancelled },
+          ] as const).map((filter) => {
+            const selected = activeFilter === filter.key;
+            return (
+              <TouchableOpacity
+                key={filter.key}
+                style={[styles.filterChip, selected && styles.filterChipActive]}
+                onPress={() => setActiveFilter(filter.key)}
+              >
+                <Text style={[styles.filterText, selected && styles.filterTextActive]}>
+                  {filter.label} ({filter.count})
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.secondaryFilters}>
+          <TouchableOpacity
+            style={styles.controlChip}
+            onPress={() => setShowFilterSheet(true)}
+          >
+            <Ionicons name="calendar-outline" size={15} color="#004AC6" />
+            <Text style={styles.controlChipText}>{dateFilterLabel}</Text>
+            <Ionicons name="chevron-down" size={13} color="#737686" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.controlChip}
+            onPress={() => setSortNewestFirst((current) => !current)}
+          >
+            <Ionicons name="swap-vertical" size={15} color="#004AC6" />
+            <Text style={styles.controlChipText}>
+              {sortNewestFirst ? 'Terbaru' : 'Terlama'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.resultCount}>
+            {filteredOrders.length} dari {orders.length}
           </Text>
-        </TouchableOpacity>
+        </View>
       </View>
 
       {/* Content */}
@@ -245,9 +350,9 @@ export default function RiwayatTransaksiScreen() {
           </View>
           <Text style={styles.emptyTitle}>Belum Ada Transaksi</Text>
           <Text style={styles.emptySub}>
-            {activeFilter === 'all'
+            {orders.length === 0
               ? 'Anda belum pernah memesan tiket konser. Jelajahi konser seru dan pesan tiket favoritmu sekarang!'
-              : 'Tidak ada transaksi dengan status ini.'}
+              : 'Tidak ada transaksi yang cocok dengan pencarian atau filter ini.'}
           </Text>
           <TouchableOpacity style={styles.exploreBtn} onPress={() => router.push('/(tabs)')} activeOpacity={0.85}>
             <Ionicons name="flame" size={16} color="#FFFFFF" />
@@ -265,41 +370,71 @@ export default function RiwayatTransaksiScreen() {
           }
           renderItem={({ item }) => {
             const posterUri = getPosterUri(item.poster);
-            const isSuccess =
-              !item.status ||
-              item.status.toLowerCase() === 'paid' ||
-              item.status.toLowerCase() === 'success' ||
-              item.status.toLowerCase() === 'verified';
+            const orderState = getOrderState(item.status);
+            const statusLabel =
+              orderState === 'success'
+                ? 'Berhasil'
+                : orderState === 'cancelled'
+                  ? 'Dibatalkan'
+                  : 'Menunggu';
 
             return (
-              <View style={styles.orderCard}>
-                {/* Header Card */}
+              <View
+                style={[
+                  styles.orderCard,
+                  orderState === 'cancelled' && styles.orderCardCancelled,
+                ]}
+              >
+                {orderState === 'pending' && <View style={styles.pendingAccent} />}
                 <View style={styles.cardHeader}>
-                  <View style={styles.cardHeaderLeft}>
-                    <Ionicons name="receipt-outline" size={14} color="#64748B" />
-                    <Text style={styles.orderNumberText}>ORDER #{item.id}</Text>
-                    <Text style={styles.dateDot}>•</Text>
-                    <Text style={styles.orderDateText}>{formatDate(item.created_at)}</Text>
+                  <View style={styles.cardHeaderDetails}>
+                    <View style={styles.orderDateLine}>
+                      <Ionicons name="calendar-outline" size={14} color="#004AC6" />
+                      <Text style={styles.orderDateText}>
+                        {formatDateTime(item.created_at)}
+                      </Text>
+                    </View>
+                    <Text style={styles.orderNumberText}>#{item.id}</Text>
                   </View>
 
                   <View
                     style={[
                       styles.statusBadge,
-                      isSuccess ? styles.statusBadgeSuccess : styles.statusBadgePending,
+                      orderState === 'success'
+                        ? styles.statusBadgeSuccess
+                        : orderState === 'cancelled'
+                          ? styles.statusBadgeCancelled
+                          : styles.statusBadgePending,
                     ]}
                   >
                     <Ionicons
-                      name={isSuccess ? 'checkmark-circle' : 'time'}
+                      name={
+                        orderState === 'success'
+                          ? 'checkmark-circle'
+                          : orderState === 'cancelled'
+                            ? 'close-circle'
+                            : 'time'
+                      }
                       size={12}
-                      color={isSuccess ? '#065F46' : '#92400E'}
+                      color={
+                        orderState === 'success'
+                          ? '#005C45'
+                          : orderState === 'cancelled'
+                            ? '#93000A'
+                            : '#8A4B00'
+                      }
                     />
                     <Text
                       style={[
                         styles.statusBadgeText,
-                        isSuccess ? styles.statusTextSuccess : styles.statusTextPending,
+                        orderState === 'success'
+                          ? styles.statusTextSuccess
+                          : orderState === 'cancelled'
+                            ? styles.statusTextCancelled
+                            : styles.statusTextPending,
                       ]}
                     >
-                      {isSuccess ? 'Lunas' : item.status || 'Pending'}
+                      {statusLabel}
                     </Text>
                   </View>
                 </View>
@@ -366,6 +501,79 @@ export default function RiwayatTransaksiScreen() {
           }}
         />
       )}
+      <Modal
+        visible={showFilterSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFilterSheet(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityLabel="Tutup filter"
+            onPress={() => setShowFilterSheet(false)}
+          />
+          <View style={styles.filterSheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeading}>
+              <Text style={styles.sheetTitle}>Filter Transaksi</Text>
+              <TouchableOpacity
+                accessibilityLabel="Tutup filter"
+                onPress={() => setShowFilterSheet(false)}
+              >
+                <Ionicons name="close" size={22} color="#434655" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.sheetSectionTitle}>Rentang waktu</Text>
+            {([
+              { key: 'all', label: 'Semua Waktu' },
+              { key: '30days', label: '30 Hari Terakhir' },
+              { key: '7days', label: '7 Hari Terakhir' },
+            ] as const).map((option) => (
+              <TouchableOpacity
+                key={option.key}
+                style={styles.sheetOption}
+                onPress={() => setDateFilter(option.key)}
+              >
+                <Text style={styles.sheetOptionText}>{option.label}</Text>
+                <Ionicons
+                  name={dateFilter === option.key ? 'radio-button-on' : 'radio-button-off'}
+                  size={20}
+                  color={dateFilter === option.key ? '#004AC6' : '#737686'}
+                />
+              </TouchableOpacity>
+            ))}
+
+            <Text style={[styles.sheetSectionTitle, styles.sortSectionTitle]}>Urutan</Text>
+            <View style={styles.sortOptions}>
+              <TouchableOpacity
+                style={[styles.sortOption, sortNewestFirst && styles.sortOptionActive]}
+                onPress={() => setSortNewestFirst(true)}
+              >
+                <Text style={[styles.sortOptionText, sortNewestFirst && styles.sortOptionTextActive]}>
+                  Terbaru
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sortOption, !sortNewestFirst && styles.sortOptionActive]}
+                onPress={() => setSortNewestFirst(false)}
+              >
+                <Text style={[styles.sortOptionText, !sortNewestFirst && styles.sortOptionTextActive]}>
+                  Terlama
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.applyFiltersButton}
+              onPress={() => setShowFilterSheet(false)}
+            >
+              <Text style={styles.applyFiltersText}>Terapkan</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -380,47 +588,69 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingTop: 10,
+    paddingBottom: 8,
     backgroundColor: '#FAF8FF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F3FF',
   },
-  headerLeft: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 2,
   },
-  brandBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#004AC6',
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 6,
   },
   brandTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#131B2E',
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
-  brandSub: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 1,
+  controls: {
+    backgroundColor: '#FAF8FF',
+    paddingBottom: 10,
+    shadowColor: '#131B2E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.035,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  refreshBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F2F3FF',
-    justifyContent: 'center',
+  searchBar: {
+    height: 44,
+    marginHorizontal: 16,
+    marginTop: 4,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    borderRadius: 24,
+    backgroundColor: '#F2F3FF',
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 0,
+    fontSize: 12,
+    color: '#131B2E',
   },
   filterRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 4,
     gap: 8,
   },
   filterChip: {
@@ -443,14 +673,45 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: '#FFFFFF',
   },
+  secondaryFilters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 7,
+    gap: 8,
+  },
+  controlChip: {
+    minHeight: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAEDFF',
+  },
+  controlChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#131B2E',
+  },
+  resultCount: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 10,
+    color: '#434655',
+  },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingTop: 14,
+    paddingBottom: 140,
     gap: 14,
   },
   orderCard: {
+    position: 'relative',
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 16,
     shadowColor: '#131B2E',
     shadowOffset: { width: 0, height: 4 },
@@ -460,31 +721,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EAEDFF',
   },
+  orderCardCancelled: {
+    opacity: 0.88,
+  },
+  pendingAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: '#D22348',
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F2F3FF',
   },
-  cardHeaderLeft: {
+  cardHeaderDetails: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  orderDateLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   orderNumberText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#131B2E',
+    fontSize: 10,
+    color: '#737686',
     fontFamily: 'monospace',
   },
-  dateDot: {
-    color: '#CBD5E1',
-    fontSize: 10,
-  },
   orderDateText: {
-    fontSize: 11,
+    flex: 1,
+    fontSize: 10,
     color: '#64748B',
   },
   statusBadge: {
@@ -501,6 +774,9 @@ const styles = StyleSheet.create({
   statusBadgePending: {
     backgroundColor: '#FEF3C7',
   },
+  statusBadgeCancelled: {
+    backgroundColor: '#FFdad6',
+  },
   statusBadgeText: {
     fontSize: 10,
     fontWeight: '800',
@@ -511,6 +787,9 @@ const styles = StyleSheet.create({
   statusTextPending: {
     color: '#92400E',
   },
+  statusTextCancelled: {
+    color: '#93000A',
+  },
   cardBody: {
     flexDirection: 'row',
     paddingVertical: 14,
@@ -519,9 +798,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F2F3FF',
   },
   posterContainer: {
-    width: 72,
-    height: 86,
-    borderRadius: 12,
+    width: 80,
+    height: 96,
+    borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#F2F3FF',
   },
@@ -671,5 +950,93 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(19, 27, 46, 0.32)',
+  },
+  filterSheet: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 28,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#C3C6D7',
+    marginBottom: 16,
+  },
+  sheetHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#131B2E',
+  },
+  sheetSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#434655',
+    marginBottom: 6,
+  },
+  sheetOption: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F3FF',
+  },
+  sheetOptionText: {
+    fontSize: 13,
+    color: '#131B2E',
+  },
+  sortSectionTitle: {
+    marginTop: 16,
+  },
+  sortOptions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sortOption: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: '#F2F3FF',
+  },
+  sortOptionActive: {
+    backgroundColor: '#DBE1FF',
+  },
+  sortOptionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#434655',
+  },
+  sortOptionTextActive: {
+    color: '#004AC6',
+  },
+  applyFiltersButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 46,
+    marginTop: 20,
+    borderRadius: 24,
+    backgroundColor: '#2563EB',
+  },
+  applyFiltersText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/context/AuthContext';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -68,111 +67,100 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Top Brand Banner */}
-          <View style={styles.headerContainer}>
-            <View style={[styles.logoBadge, { backgroundColor: colors.tint }]}>
-              <Ionicons name="musical-notes" size={32} color="#FFFFFF" />
+          <View style={[styles.hero, { backgroundColor: colors.tint }]}>
+            <View style={styles.heroShapeLeft} />
+            <View style={styles.heroShapeRight} />
+            <View style={styles.logoBadge}>
+              <Ionicons name="musical-notes" size={25} color="#FFFFFF" />
             </View>
-            <ThemedText type="title" style={styles.brandTitle}>
-              Concertix
-            </ThemedText>
-            <ThemedText style={[styles.subtitleText, { color: colors.textSecondary }]}>
-              Pesan tiket konser artis favoritmu dengan mudah
+            <ThemedText style={styles.heroTitle}>Selamat datang kembali</ThemedText>
+            <ThemedText style={styles.heroSubtitle}>
+              Masuk untuk melanjutkan pengalaman konsermu
             </ThemedText>
           </View>
 
-          {/* Error Banner */}
-          {errorMessage ? (
-            <View style={[styles.errorBanner, { backgroundColor: colors.error + '15', borderColor: colors.error + '40' }]}>
-              <Ionicons name="alert-circle" size={18} color={colors.error} />
-              <ThemedText style={[styles.errorText, { color: colors.error }]}>
-                {errorMessage}
-              </ThemedText>
-            </View>
-          ) : null}
+          <View
+            style={[
+              styles.formCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <ThemedText style={[styles.formTitle, { color: colors.text }]}>
+              Masuk ke akun Concertix
+            </ThemedText>
+            <ThemedText style={[styles.formSubtitle, { color: colors.textSecondary }]}>
+              Gunakan email dan kata sandi yang terdaftar.
+            </ThemedText>
 
-          {/* Form Box */}
-          <View style={styles.formContainer}>
-            {/* Email Field */}
-            <View style={styles.inputGroup}>
-              <ThemedText style={[styles.label, { color: colors.text }]}>Email</ThemedText>
+            {errorMessage ? (
               <View
                 style={[
-                  styles.inputWrapper,
+                  styles.errorBanner,
                   {
-                    backgroundColor: colors.backgroundElement,
-                    borderColor: colors.border,
+                    backgroundColor: colors.error + '15',
+                    borderColor: colors.error + '40',
                   },
                 ]}
               >
-                <Ionicons
-                  name="mail-outline"
-                  size={20}
-                  color={colors.placeholder}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="nama@email.com"
-                  placeholderTextColor={colors.placeholder}
-                  value={email}
-                  onChangeText={(val) => {
-                    setEmail(val);
-                    if (errorMessage) setErrorMessage('');
-                  }}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!loading}
-                />
+                <Ionicons name="alert-circle" size={18} color={colors.error} />
+                <ThemedText style={[styles.errorText, { color: colors.error }]}>
+                  {errorMessage}
+                </ThemedText>
               </View>
+            ) : null}
+
+            <View style={styles.inputGroup}>
+              <TextInput
+                style={[
+                  styles.input,
+                  { backgroundColor: colors.backgroundElement, color: colors.text },
+                ]}
+                placeholder="Email"
+                placeholderTextColor={colors.placeholder}
+                value={email}
+                onChangeText={(val) => {
+                  setEmail(val);
+                  if (errorMessage) setErrorMessage('');
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+                accessibilityLabel="Email"
+                returnKeyType="next"
+              />
             </View>
 
-            {/* Password Field */}
-            <View style={styles.inputGroup}>
-              <ThemedText style={[styles.label, { color: colors.text }]}>Password</ThemedText>
-              <View
-                style={[
-                  styles.inputWrapper,
-                  {
-                    backgroundColor: colors.backgroundElement,
-                    borderColor: colors.border,
-                  },
-                ]}
+            <View style={[styles.passwordWrapper, { backgroundColor: colors.backgroundElement }]}>
+              <TextInput
+                style={[styles.input, styles.passwordInput, { color: colors.text }]}
+                placeholder="Kata sandi"
+                placeholderTextColor={colors.placeholder}
+                value={password}
+                onChangeText={(val) => {
+                  setPassword(val);
+                  if (errorMessage) setErrorMessage('');
+                }}
+                secureTextEntry={!showPassword}
+                editable={!loading}
+                accessibilityLabel="Kata sandi"
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                disabled={loading}
+                style={[styles.eyeIcon, { borderLeftColor: colors.border }]}
+                accessibilityLabel={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
               >
                 <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color={colors.placeholder}
-                  style={styles.inputIcon}
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={19}
+                  color={colors.textSecondary}
                 />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="Masukkan password Anda"
-                  placeholderTextColor={colors.placeholder}
-                  value={password}
-                  onChangeText={(val) => {
-                    setPassword(val);
-                    if (errorMessage) setErrorMessage('');
-                  }}
-                  secureTextEntry={!showPassword}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                  style={styles.eyeIcon}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={20}
-                    color={colors.placeholder}
-                  />
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             </View>
 
-            {/* Submit Button */}
             <TouchableOpacity
               style={[
                 styles.submitButton,
@@ -188,11 +176,10 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <ThemedText style={styles.submitButtonText}>Masuk ke Akun</ThemedText>
+                <ThemedText style={styles.submitButtonText}>Masuk</ThemedText>
               )}
             </TouchableOpacity>
 
-            {/* Register Link */}
             <View style={styles.registerContainer}>
               <ThemedText style={{ color: colors.textSecondary }}>
                 Belum punya akun?{' '}
@@ -200,20 +187,19 @@ export default function LoginScreen() {
               <Link href="/register" asChild>
                 <TouchableOpacity>
                   <ThemedText style={[styles.linkBold, { color: colors.accent }]}>
-                    Daftar di sini
+                    Daftar sekarang
                   </ThemedText>
                 </TouchableOpacity>
               </Link>
             </View>
 
-            {/* Guest Action */}
             <TouchableOpacity
               style={styles.guestButton}
               onPress={() => router.replace('/(tabs)')}
               disabled={loading}
             >
               <ThemedText style={[styles.guestText, { color: colors.textSecondary }]}>
-                Masuk sebagai Tamu →
+                Jelajahi sebagai tamu
               </ThemedText>
             </TouchableOpacity>
           </View>
@@ -232,99 +218,146 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-  },
-  headerContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+  },
+  hero: {
+    width: '100%',
+    minHeight: 226,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 70,
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  heroShapeLeft: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    left: -64,
+    bottom: -34,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  heroShapeRight: {
+    position: 'absolute',
+    width: 112,
+    height: 112,
+    right: -48,
+    bottom: -18,
+    borderRadius: 56,
+    backgroundColor: 'rgba(180,197,255,0.45)',
   },
   logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    marginBottom: 10,
   },
-  brandTitle: {
-    fontSize: 30,
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 25,
     fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  subtitleText: {
-    fontSize: 14,
+    letterSpacing: -0.4,
     textAlign: 'center',
-    maxWidth: 280,
+  },
+  heroSubtitle: {
+    color: '#DBEAFE',
+    fontSize: 12,
+    textAlign: 'center',
+    maxWidth: 270,
+    marginTop: 5,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    borderRadius: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    marginBottom: 18,
+    marginTop: 16,
   },
   errorText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
     flex: 1,
   },
-  formContainer: {
+  formCard: {
     width: '100%',
+    maxWidth: 500,
+    marginTop: -48,
+    padding: 20,
+    borderWidth: 1,
+    borderRadius: 24,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 20,
+    elevation: 4,
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  formSubtitle: {
+    fontSize: 12,
+    marginTop: 3,
+    marginBottom: 6,
   },
   inputGroup: {
-    marginBottom: 18,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    minHeight: 50,
-  },
-  inputIcon: {
-    marginRight: 10,
+    marginTop: 14,
   },
   input: {
-    flex: 1,
-    fontSize: 15,
-    paddingVertical: 12,
+    minHeight: 50,
+    borderRadius: 26,
+    paddingHorizontal: 17,
+    fontSize: 13,
   },
   eyeIcon: {
-    padding: 6,
-  },
-  submitButton: {
-    borderRadius: 14,
-    paddingVertical: 15,
+    width: 46,
+    minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+  },
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 50,
+    marginTop: 12,
+    borderRadius: 26,
+    overflow: 'hidden',
+  },
+  passwordInput: {
+    flex: 1,
+    minHeight: 50,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+  },
+  submitButton: {
+    borderRadius: 28,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
     minHeight: 52,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
+    shadowColor: '#004AC6',
+    shadowOpacity: 0.18,
     shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 6,
-    elevation: 2,
+    shadowRadius: 9,
+    elevation: 3,
   },
   submitButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
   },
   registerContainer: {
@@ -335,16 +368,16 @@ const styles = StyleSheet.create({
   },
   linkBold: {
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
   guestButton: {
-    marginTop: 18,
+    marginTop: 10,
     alignItems: 'center',
     paddingVertical: 8,
   },
   guestText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
 

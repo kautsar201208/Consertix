@@ -199,6 +199,7 @@ export default function TambahEventPage() {
     const errs: Record<string, string> = {};
     if (!judul.trim()) errs.judul = "Nama event wajib diisi.";
     if (!kategori) errs.kategori = "Kategori acara wajib dipilih.";
+    if (!deskripsi.trim()) errs.deskripsi = "Deskripsi event wajib diisi.";
     if (!venue.trim()) errs.venue = "Nama venue tempat wajib diisi.";
     if (!kota.trim()) errs.kota = "Kota pelaksanaan wajib diisi.";
     if (!tanggalMulai) errs.tanggalMulai = "Tanggal pelaksanaan wajib diisi.";
@@ -261,6 +262,8 @@ export default function TambahEventPage() {
         if (!res.ok) {
           throw new Error(data.message || "Gagal menyimpan event ke backend.");
         }
+      } else {
+        throw new Error("Sesi login telah berakhir. Silakan login kembali.");
       }
 
       setSuccess(
@@ -460,12 +463,12 @@ export default function TambahEventPage() {
                 {/* Deskripsi Lengkap Acara */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800">
-                      Deskripsi Lengkap Acara
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      Deskripsi Lengkap Acara <span className="text-rose-500">*</span>
                     </label>
                     <span className="text-[11px] text-slate-400">Format teks didukung</span>
                   </div>
-                  <div className="rounded-2xl bg-slate-50 p-2 border border-slate-200">
+                  <div className={`rounded-2xl bg-slate-50 p-2 border ${errors.deskripsi ? "border-rose-300" : "border-slate-200"}`}>
                     <div className="flex items-center gap-1 pb-2 px-1 text-slate-400 text-xs border-b border-slate-200/60 mb-2">
                       <span className="px-2 py-0.5 bg-white rounded font-bold text-slate-700 shadow-xs">
                         B
@@ -489,6 +492,9 @@ export default function TambahEventPage() {
                       className="w-full p-3 rounded-xl bg-white text-slate-900 text-sm placeholder:text-slate-400 border border-slate-200/60 focus:outline-none focus:border-[#111844] resize-none transition"
                     />
                   </div>
+                  {errors.deskripsi && (
+                    <span className="text-xs text-rose-500 font-medium">{errors.deskripsi}</span>
+                  )}
                 </div>
 
                 {/* Jadwal Pelaksanaan (4 Fields Grid) */}

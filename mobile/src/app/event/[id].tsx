@@ -100,6 +100,77 @@ const FALLBACK_EVENTS: Record<string, EventDetail> = {
   },
 };
 
+interface ArtistInfo {
+  name: string;
+  role: string;
+  initials: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+}
+
+const ARTIST_THEMES = [
+  { color: '#004AC6', bgColor: '#DBE1FF', borderColor: '#2563EB', icon: 'mic' as const },
+  { color: '#4B41E1', bgColor: '#E2DFFF', borderColor: '#645EFB', icon: 'musical-notes' as const },
+  { color: '#AD0033', bgColor: '#FFDADB', borderColor: '#D22348', icon: 'sparkles' as const },
+  { color: '#006C50', bgColor: '#A6F5D0', borderColor: '#008765', icon: 'disc' as const },
+  { color: '#7C3AED', bgColor: '#EDE9FE', borderColor: '#8B5CF6', icon: 'headset' as const },
+  { color: '#D97706', bgColor: '#FEF3C7', borderColor: '#F59E0B', icon: 'flame' as const },
+];
+
+const parseArtistList = (artistString?: string): ArtistInfo[] => {
+  if (!artistString || !artistString.trim()) {
+    return [
+      {
+        name: 'Musisi Tamu',
+        role: 'Headliner',
+        initials: 'MT',
+        icon: 'mic',
+        color: '#004AC6',
+        bgColor: '#DBE1FF',
+        borderColor: '#2563EB',
+      },
+    ];
+  }
+
+  // Pisahkan nama artis yang terpisah oleh koma (,), titik koma (;), baris baru (\n), atau slash (/)
+  let names = artistString
+    .split(/[,;\n/]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  // Jika setelah koma hanya 1 tapi ada " & " dan bukan nama band seperti "Maliq & D'Essentials"
+  if (names.length === 1) {
+    const single = names[0];
+    if (/\s+&\s+/.test(single) && !/maliq/i.test(single)) {
+      names = single.split(/\s+&\s+/).map((s) => s.trim()).filter(Boolean);
+    } else if (/\s+(?:feat\.?|ft\.?)\s+/i.test(single)) {
+      names = single.split(/\s+(?:feat\.?|ft\.?)\s+/i).map((s) => s.trim()).filter(Boolean);
+    }
+  }
+
+  const roleLabels = ['Headliner', 'Special Guest', 'Guest Star', 'Co-Headliner', 'Opening Act', 'Special Show'];
+
+  return names.map((name, idx) => {
+    const theme = ARTIST_THEMES[idx % ARTIST_THEMES.length];
+    const words = name.split(' ').filter(Boolean);
+    const initials = words.length > 1
+      ? (words[0][0] + words[1][0]).toUpperCase()
+      : name.slice(0, 2).toUpperCase();
+
+    return {
+      name,
+      role: roleLabels[idx] || 'Performer',
+      initials,
+      icon: idx === 0 ? 'mic' : theme.icon,
+      color: theme.color,
+      bgColor: theme.bgColor,
+      borderColor: theme.borderColor,
+    };
+  });
+};
+
 export default function EventDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -257,6 +328,7 @@ export default function EventDetailScreen() {
 
   const posterUri = getPosterUri(event.poster);
   const minPrice = getMinPrice();
+  const artistList = parseArtistList(event.nama_artis);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -407,45 +479,64 @@ export default function EventDetailScreen() {
           <View style={styles.sectionHeader}>
             <View>
               <Text style={styles.sectionHeading}>Line-up Penampil</Text>
-              <Text style={styles.sectionSubheading}>Musisi & Artis Spesial</Text>
+              <Text style={styles.sectionSubheading}>
+                {artistList.length} Musisi &amp; Artis Terpilih
+              </Text>
+            </View>
+            <View style={styles.artistCountBadge}>
+              <Ionicons name="musical-notes" size={12} color="#004AC6" />
+              <Text style={styles.artistCountBadgeText}>{artistList.length} Penampil</Text>
             </View>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.artistScroll}>
-            {/* Main Artist / Headliner */}
-            <View style={styles.artistItem}>
-              <View style={styles.artistAvatarWrapper}>
-                <View style={styles.artistAvatarGradient}>
-                  <View style={styles.artistAvatarPlaceholder}>
-                    <Ionicons name="mic" size={26} color="#004AC6" />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.artistScrollContent}
+            style={styles.artistScroll}
+          >
+            {artistList.map((artist, index) => {
+              const isHeadliner = index === 0;
+              return (
+                <View key={`${artist.name}-${index}`} style={styles.artistItem}>
+                  <View style={styles.artistAvatarWrapper}>
+                    <View
+                      style={[
+                        styles.artistAvatarGradient,
+                        { backgroundColor: artist.borderColor },
+                        !isHeadliner && styles.artistAvatarGradientSubtle,
+                      ]}
+                    >
+                      <View style={[styles.artistAvatarPlaceholder, { backgroundColor: artist.bgColor }]}>
+                        <Text style={[styles.artistInitials, { color: artist.color }]}>
+                          {artist.initials}
+                        </Text>
+                      </View>
+                    </View>
+                    {isHeadliner ? (
+                      <View style={styles.starBadge}>
+                        <Ionicons name="star" size={10} color="#FFFFFF" />
+                      </View>
+                    ) : (
+                      <View style={[styles.subBadge, { backgroundColor: artist.borderColor }]}>
+                        <Ionicons name={artist.icon} size={9} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.artistName} numberOfLines={2}>
+                    {artist.name}
+                  </Text>
+                  <View style={[styles.roleTag, isHeadliner && styles.roleTagHeadliner]}>
+                    <Text
+                      style={[styles.artistRole, isHeadliner && styles.artistRoleHeadliner]}
+                      numberOfLines={1}
+                    >
+                      {artist.role}
+                    </Text>
                   </View>
                 </View>
-                <View style={styles.starBadge}>
-                  <Ionicons name="star" size={10} color="#FFFFFF" />
-                </View>
-              </View>
-              <Text style={styles.artistName} numberOfLines={1}>
-                {event.nama_artis}
-              </Text>
-              <Text style={styles.artistRole}>Headliner</Text>
-            </View>
-
-            {/* Guest Star Placeholders */}
-            <View style={styles.artistItem}>
-              <View style={styles.artistAvatarPlain}>
-                <Ionicons name="musical-notes" size={22} color="#64748B" />
-              </View>
-              <Text style={styles.artistName}>Special Guest</Text>
-              <Text style={styles.artistRole}>Opening Act</Text>
-            </View>
-
-            <View style={styles.artistItem}>
-              <View style={styles.artistAvatarPlain}>
-                <Ionicons name="headset" size={22} color="#64748B" />
-              </View>
-              <Text style={styles.artistName}>DJ Session</Text>
-              <Text style={styles.artistRole}>Afterparty</Text>
-            </View>
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -973,51 +1064,76 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   artistScroll: {
-    paddingTop: 4,
+    paddingTop: 6,
+  },
+  artistScrollContent: {
+    paddingRight: 16,
   },
   artistItem: {
     alignItems: 'center',
-    marginRight: 16,
-    width: 76,
+    marginRight: 14,
+    width: 86,
   },
   artistAvatarWrapper: {
     position: 'relative',
-    width: 68,
-    height: 68,
-  },
-  artistAvatarGradient: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#2563EB',
-    padding: 3,
+    width: 66,
+    height: 66,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  artistAvatarGradient: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: '#004AC6',
+    padding: 2.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  artistAvatarGradientSubtle: {
+    padding: 2,
   },
   artistAvatarPlaceholder: {
     width: '100%',
     height: '100%',
-    borderRadius: 32,
+    borderRadius: 31,
     backgroundColor: '#DBE1FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  artistAvatarPlain: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#EAEDFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
+  artistInitials: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#004AC6',
+    letterSpacing: -0.5,
   },
   starBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#2563EB',
+    bottom: -1,
+    right: -1,
+    backgroundColor: '#004AC6',
     borderRadius: 10,
-    padding: 3,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 3,
+  },
+  subBadge: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    backgroundColor: '#4B41E1',
+    borderRadius: 9,
+    width: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    elevation: 2,
   },
   artistName: {
     fontSize: 11,
@@ -1025,11 +1141,41 @@ const styles = StyleSheet.create({
     color: '#131B2E',
     marginTop: 6,
     textAlign: 'center',
+    lineHeight: 15,
+  },
+  roleTag: {
+    marginTop: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+  },
+  roleTagHeadliner: {
+    backgroundColor: '#DBE1FF',
   },
   artistRole: {
-    fontSize: 10,
+    fontSize: 9,
+    fontWeight: '600',
     color: '#64748B',
     textAlign: 'center',
+  },
+  artistRoleHeadliner: {
+    color: '#004AC6',
+    fontWeight: '800',
+  },
+  artistCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DBE1FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  artistCountBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#004AC6',
   },
   emptyTicketCard: {
     padding: 16,

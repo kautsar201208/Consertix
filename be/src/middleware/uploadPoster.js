@@ -13,10 +13,10 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const ekstensi = /\.(jpg|jpeg|png)$/i;
+  const ekstensi = /\.(jpg|jpeg|png|webp|avif|gif)$/i;
 
   if (!ekstensi.test(file.originalname)) {
-    return cb(new Error("File harus berupa JPG, JPEG, atau PNG"));
+    return cb(new Error("Format file poster harus berupa JPG, JPEG, PNG, atau WEBP"));
   }
 
   cb(null, true);

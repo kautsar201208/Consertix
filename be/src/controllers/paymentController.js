@@ -137,8 +137,23 @@ const verifikasiPembayaran = async (req, res) => {
 
 const snap = require("../config/midtrans");
 
+const isMidtransConfigured = () =>
+  Boolean(
+    process.env.MIDTRANS_SERVER_KEY?.trim() &&
+      process.env.MIDTRANS_CLIENT_KEY?.trim() &&
+      !process.env.MIDTRANS_SERVER_KEY.includes("placeholder") &&
+      !process.env.MIDTRANS_CLIENT_KEY.includes("placeholder")
+  );
+
 // Membuat Snap Token Midtrans untuk Order Tiket
 const createMidtransTransaction = async (req, res) => {
+  if (!isMidtransConfigured()) {
+    return res.status(503).json({
+      message:
+        "Midtrans belum dikonfigurasi. Isi MIDTRANS_SERVER_KEY dan MIDTRANS_CLIENT_KEY di be/.env dengan credential Sandbox Midtrans.",
+    });
+  }
+
   const {
     order_id,
     gross_amount,

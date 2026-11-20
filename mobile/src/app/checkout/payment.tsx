@@ -16,7 +16,59 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '@/config/api';
 import { storage } from '@/utils/storage';
-import { WebView } from 'react-native-webview';
+import * as WebBrowser from 'expo-web-browser';
+
+// Safe WebView wrapper (fallback gracefully if native package is not linked)
+let RNativeWebView: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  RNativeWebView = require('react-native-webview')?.WebView || null;
+} catch {
+  RNativeWebView = null;
+}
+
+const SafeWebView = (props: any) => {
+  if (RNativeWebView) {
+    return <RNativeWebView {...props} />;
+  }
+
+  return (
+    <View style={{ flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+      <Ionicons name="card-outline" size={54} color="#004AC6" style={{ marginBottom: 16 }} />
+      <Text style={{ fontSize: 16, fontWeight: '800', color: '#131B2E', marginBottom: 8, textAlign: 'center' }}>
+        Lanjutkan Pembayaran Midtrans
+      </Text>
+      <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginBottom: 20, lineHeight: 18 }}>
+        Klik tombol di bawah untuk membuka gerbang pembayaran Midtrans Snap di jendela aman.
+      </Text>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => {
+          if (props.source?.uri) {
+            WebBrowser.openBrowserAsync(props.source.uri);
+          }
+        }}
+        style={{
+          backgroundColor: '#004AC6',
+          paddingHorizontal: 22,
+          paddingVertical: 12,
+          borderRadius: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          shadowColor: '#004AC6',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 8,
+          elevation: 4,
+        }}
+      >
+        <Ionicons name="open-outline" size={18} color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Buka Portal Midtrans</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -1047,7 +1099,7 @@ export default function PaymentScreen() {
 
           {/* WebView Midtrans Snap */}
           {snapUrl && !paymentConfirmed ? (
-            <WebView
+            <SafeWebView
               source={{ uri: snapUrl }}
               style={styles.webView}
               startInLoadingState={true}
@@ -1057,7 +1109,7 @@ export default function PaymentScreen() {
                   <Text style={styles.webViewLoadingText}>Memuat Halaman Pembayaran Midtrans...</Text>
                 </View>
               )}
-              onNavigationStateChange={(navState) => {
+              onNavigationStateChange={(navState: any) => {
                 const url = (navState.url || '').toLowerCase();
                 // Deteksi URL finish/success dari callback Midtrans
                 if (
