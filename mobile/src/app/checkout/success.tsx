@@ -619,11 +619,11 @@ export default function CheckoutSuccessScreen() {
 
         <TouchableOpacity
           style={styles.myTicketsBtn}
-          onPress={() => router.replace('/(tabs)')}
+          onPress={() => router.replace('/(tabs)/transaksi' as any)}
           activeOpacity={0.8}
         >
-          <Ionicons name="ticket-outline" size={18} color="#FFFFFF" />
-          <Text style={styles.myTicketsBtnText}>Tiket Saya</Text>
+          <Ionicons name="receipt-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.myTicketsBtnText}>Riwayat Transaksi</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
