@@ -34,6 +34,11 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout 
       signal: controller.signal,
     });
     return response;
+  } catch (err: any) {
+    if (err?.name === 'AbortError' || err?.message?.includes('canceled') || err?.message?.includes('aborted')) {
+      throw new Error(`Koneksi waktu habis (Timeout). Pastikan HP dan laptop di Wi-Fi yang sama dan server backend aktif.`);
+    }
+    throw err;
   } finally {
     clearTimeout(id);
   }

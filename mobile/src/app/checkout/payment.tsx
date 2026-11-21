@@ -374,8 +374,9 @@ export default function PaymentScreen() {
 
   const getPosterUri = (poster: string | null | undefined) => {
     if (!poster) return null;
-    if (poster.startsWith('http')) return poster;
-    const cleanPoster = poster.startsWith('/') ? poster.slice(1) : poster;
+    const normalizedPoster = poster.replace(/\.avif$/i, '.jpg');
+    if (normalizedPoster.startsWith('http')) return normalizedPoster;
+    const cleanPoster = normalizedPoster.startsWith('/') ? normalizedPoster.slice(1) : normalizedPoster;
     if (cleanPoster.startsWith('uploads/')) {
       return `${API_URL}/${cleanPoster}`;
     }
@@ -656,7 +657,11 @@ export default function PaymentScreen() {
             >
               <View style={styles.methodLeft}>
                 <View style={styles.methodIconBox}>
-                  <Ionicons name="qr-code" size={22} color="#004AC6" />
+                  <Image
+                    source={require('@/assets/images/payments/qris.png')}
+                    style={styles.methodLogoImage}
+                    resizeMode="contain"
+                  />
                 </View>
                 <View style={styles.methodInfoCol}>
                   <View style={styles.methodTitleRow}>
@@ -691,7 +696,11 @@ export default function PaymentScreen() {
             >
               <View style={styles.methodLeft}>
                 <View style={styles.methodIconBox}>
-                  <Ionicons name="wallet-outline" size={22} color="#645EFB" />
+                  <Image
+                    source={require('@/assets/images/payments/gopay.png')}
+                    style={styles.methodLogoImage}
+                    resizeMode="contain"
+                  />
                 </View>
                 <View style={styles.methodInfoCol}>
                   <Text style={styles.methodTitle}>GoPay / GoPay Later</Text>
@@ -723,7 +732,11 @@ export default function PaymentScreen() {
             >
               <View style={styles.methodLeft}>
                 <View style={styles.methodIconBox}>
-                  <Ionicons name="business-outline" size={22} color="#434655" />
+                  <Image
+                    source={require('@/assets/images/payments/bca.png')}
+                    style={styles.methodLogoImage}
+                    resizeMode="contain"
+                  />
                 </View>
                 <View style={styles.methodInfoCol}>
                   <Text style={styles.methodTitle}>BCA Virtual Account</Text>
@@ -753,7 +766,11 @@ export default function PaymentScreen() {
             >
               <View style={styles.methodLeft}>
                 <View style={styles.methodIconBox}>
-                  <Ionicons name="business-outline" size={22} color="#434655" />
+                  <Image
+                    source={require('@/assets/images/payments/mandiri.png')}
+                    style={styles.methodLogoImage}
+                    resizeMode="contain"
+                  />
                 </View>
                 <View style={styles.methodInfoCol}>
                   <Text style={styles.methodTitle}>Bank Mandiri Virtual Account</Text>
@@ -783,7 +800,11 @@ export default function PaymentScreen() {
             >
               <View style={styles.methodLeft}>
                 <View style={styles.methodIconBox}>
-                  <Ionicons name="card-outline" size={22} color="#434655" />
+                  <Image
+                    source={require('@/assets/images/payments/card.png')}
+                    style={styles.methodLogoImage}
+                    resizeMode="contain"
+                  />
                 </View>
                 <View style={styles.methodInfoCol}>
                   <Text style={styles.methodTitle}>Kartu Kredit / Debit Online</Text>
@@ -1702,7 +1723,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   methodIconBox: {
-    width: 38,
+    width: 44,
     height: 38,
     borderRadius: 8,
     backgroundColor: '#FFFFFF',
@@ -1710,6 +1731,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#EAEDFF',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  methodLogoImage: {
+    width: '100%',
+    height: '100%',
   },
   methodInfoCol: {
     flex: 1,

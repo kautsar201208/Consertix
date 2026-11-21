@@ -243,8 +243,9 @@ export default function EventDetailScreen() {
 
   const getPosterUri = (poster: string | null) => {
     if (!poster) return null;
-    if (poster.startsWith('http')) return poster;
-    const cleanPoster = poster.startsWith('/') ? poster.slice(1) : poster;
+    const normalizedPoster = poster.replace(/\.avif$/i, '.jpg');
+    if (normalizedPoster.startsWith('http')) return normalizedPoster;
+    const cleanPoster = normalizedPoster.startsWith('/') ? normalizedPoster.slice(1) : normalizedPoster;
     if (cleanPoster.startsWith('uploads/')) {
       return `${API_URL}/${cleanPoster}`;
     }

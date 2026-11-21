@@ -66,7 +66,6 @@ export default function CheckoutFormScreen() {
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState('');
   const [dateBirth, setDateBirth] = useState('1998-09-18');
-  const [gender, setGender] = useState<'male' | 'female'>('male');
 
   // 4. Data Pengunjung Tambahan (jika tiket > 1)
   const ticketCount = parseInt(params.quantity || '1', 10);
@@ -139,8 +138,9 @@ export default function CheckoutFormScreen() {
 
   const getPosterUri = (poster: string | null) => {
     if (!poster) return null;
-    if (poster.startsWith('http')) return poster;
-    const cleanPoster = poster.startsWith('/') ? poster.slice(1) : poster;
+    const normalizedPoster = poster.replace(/\.avif$/i, '.jpg');
+    if (normalizedPoster.startsWith('http')) return normalizedPoster;
+    const cleanPoster = normalizedPoster.startsWith('/') ? normalizedPoster.slice(1) : normalizedPoster;
     if (cleanPoster.startsWith('uploads/')) {
       return `${API_URL}/${cleanPoster}`;
     }
@@ -380,7 +380,7 @@ export default function CheckoutFormScreen() {
             </View>
           </View>
 
-          {/* Tanggal Lahir & Jenis Kelamin */}
+          {/* Tanggal Lahir */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Tanggal Lahir (Batas Usia 17+)</Text>
             <View style={styles.inputFieldBox}>
@@ -392,43 +392,6 @@ export default function CheckoutFormScreen() {
                 value={dateBirth}
                 onChangeText={setDateBirth}
               />
-            </View>
-          </View>
-
-          {/* Jenis Kelamin Radio Pills */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Jenis Kelamin</Text>
-            <View style={styles.genderRow}>
-              <TouchableOpacity
-                style={[styles.genderPill, gender === 'male' && styles.genderPillActive]}
-                onPress={() => setGender('male')}
-              >
-                <Ionicons
-                  name="male"
-                  size={16}
-                  color={gender === 'male' ? '#FFFFFF' : '#434655'}
-                />
-                <Text
-                  style={[styles.genderText, gender === 'male' && styles.genderTextActive]}
-                >
-                  Laki-laki
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.genderPill, gender === 'female' && styles.genderPillActive]}
-                onPress={() => setGender('female')}
-              >
-                <Ionicons
-                  name="female"
-                  size={16}
-                  color={gender === 'female' ? '#FFFFFF' : '#434655'}
-                />
-                <Text
-                  style={[styles.genderText, gender === 'female' && styles.genderTextActive]}
-                >
-                  Perempuan
-                </Text>
-              </TouchableOpacity>
             </View>
           </View>
         </View>

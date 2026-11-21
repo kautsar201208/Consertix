@@ -210,8 +210,9 @@ export default function HomeScreen() {
 
   const getPosterUri = (poster: string | null) => {
     if (!poster) return null;
-    if (poster.startsWith('http')) return poster;
-    const cleanPoster = poster.startsWith('/') ? poster.slice(1) : poster;
+    const normalizedPoster = poster.replace(/\.avif$/i, '.jpg');
+    if (normalizedPoster.startsWith('http')) return normalizedPoster;
+    const cleanPoster = normalizedPoster.startsWith('/') ? normalizedPoster.slice(1) : normalizedPoster;
     if (cleanPoster.startsWith('uploads/')) {
       return `${API_URL}/${cleanPoster}`;
     }
@@ -238,7 +239,6 @@ export default function HomeScreen() {
             onPress={() => Alert.alert('Notifikasi', 'Tidak ada notifikasi baru saat ini.')}
           >
             <Ionicons name="notifications-outline" size={20} color="#1E293B" />
-            <View style={styles.notificationDot} />
           </TouchableOpacity>
 
           {isLoggedIn ? (

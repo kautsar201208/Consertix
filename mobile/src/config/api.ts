@@ -7,7 +7,7 @@ import Constants from 'expo-constants';
  * - Untuk HP Fisik via Expo Go (Wi-Fi): Otomatis membaca IP host atau fallback ke IP Wi-Fi komputer
  * - Untuk Android Emulator (AVD): http://10.0.2.2:5000 atau IP lokal
  */
-export const LOCAL_DEV_IP = '10.28.48.51';
+export const LOCAL_DEV_IP = '192.168.1.9';
 export const PORT = '5000';
 
 export const getApiUrl = (): string => {
